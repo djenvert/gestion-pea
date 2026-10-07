@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon PEA</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --wash: rgba(11,11,11,0.04);
+  --serie: #2a78d6;          /* valorisation, poids */
+  --gain: #2a78d6;           /* pôle bleu du divergent */
+  --perte: #e34948;          /* pôle rouge du divergent */
+  --contexte: #898781;       /* montant investi (série de contexte) */
+  --texte-gain: #006300;
+  --texte-perte: #b42323;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+    --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781;
+    --texte-gain: #0ca30c; --texte-perte: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+  --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781;
+  --texte-gain: #0ca30c; --texte-perte: #e66767;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0; font-weight: 600; }
+h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
+.sous-titre { color: var(--ink-2); margin: 2px 0 0; }
+.note { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* KPI */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }
+.kpis .hero { grid-column: span 2; }
+@media (max-width: 520px) { .kpis .hero { grid-column: 1 / -1; } .tuile.hero .valeur { font-size: 40px; } }
+.tuile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tuile .label { color: var(--ink-2); font-size: 13px; }
+.tuile .valeur { font-size: 22px; font-weight: 600; margin-top: 4px; }
+.tuile.hero .valeur { font-size: 48px; line-height: 1.1; letter-spacing: -0.02em; }
+.delta { font-size: 13px; font-weight: 500; margin-top: 4px; }
+.delta.gain { color: var(--texte-gain); } .delta.perte { color: var(--texte-perte); }
+
+/* Filtres */
+.filtres { display: flex; align-items: center; gap: 10px; margin: 8px 0 12px; flex-wrap: wrap; }
+.filtres .label { color: var(--ink-2); font-size: 13px; }
+.segments { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+            background: var(--surface); }
+.segments button { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: 0;
+                   padding: 5px 12px; cursor: pointer; white-space: nowrap; }
+@media (max-width: 520px) { .segments button { padding: 5px 8px; } }
+.segments button + button { border-left: 1px solid var(--border); }
+.segments button:hover { background: var(--wash); }
+.segments button[aria-pressed="true"] { color: var(--ink); font-weight: 600; background: var(--wash); }
+
+/* Cartes */
+.carte { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+         padding: 16px; margin-bottom: 12px; min-width: 0; }
+.grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 12px; }
+.grille .carte { margin-bottom: 0; }
+.grille + .carte, .grille + .grille { margin-top: 12px; }
+.legende { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); margin: 6px 0 4px; }
+.legende span { display: inline-flex; align-items: center; gap: 6px; }
+.cle-ligne { width: 16px; height: 2px; border-radius: 1px; display: inline-block; }
+.cle-rect { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* Graphique en ligne */
+.graphe { position: relative; }
+.graphe svg { display: block; width: 100%; overflow: visible; }
+.graphe .zone { cursor: crosshair; outline: none; }
+.graphe .zone:focus-visible { outline: 2px solid var(--serie); outline-offset: 2px; }
+.axe text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Barres horizontales (HTML) */
+.barres { display: grid; grid-template-columns: minmax(90px, 34%) 1fr; row-gap: 4px; align-items: center; }
+.barres .nom { color: var(--ink-2); font-size: 13px; white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; padding-right: 10px; }
+.barres .piste { position: relative; height: 22px; }
+.barres .ligne { display: contents; }
+.barres .ligne > * { outline: none; }
+.barres .ligne:hover > *, .barres .ligne:focus-within > * { background: var(--wash); }
+.barres .barre { position: absolute; top: 4px; height: 14px; }
+.barres .valeur { position: absolute; top: 2px; font-size: 12px; color: var(--ink-2); white-space: nowrap;
+                  font-variant-numeric: tabular-nums; }
+.barres .zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--axis); }
+
+/* Infobulle */
+.infobulle { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--ink);
+             border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+             box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 160px; display: none; }
+.infobulle .titre { color: var(--ink-2); margin-bottom: 4px; }
+.infobulle .rang { display: flex; align-items: center; gap: 8px; }
+.infobulle .rang strong { font-variant-numeric: tabular-nums; }
+.infobulle .rang .nom { color: var(--ink-2); }
+
+/* Tableaux */
+details { margin-top: 10px; }
+summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+.defile { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 7px 8px; border-bottom: 1px solid var(--grid); text-align: left; white-space: nowrap; }
+th { color: var(--ink-2); font-weight: 500; position: sticky; top: 0; background: var(--surface); }
+th[data-tri] { cursor: pointer; user-select: none; }
+th[data-tri]:hover { color: var(--ink); }
+th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; }
+th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+td .isin { color: var(--muted); font-size: 11px; display: block; }
+.badge { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--border);
+         border-radius: 999px; font-size: 11px; color: var(--ink-2); vertical-align: 1px; }
+.partager { font: inherit; font-size: 12px; color: var(--ink-2); background: none; cursor: pointer;
+            border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; }
+.partager:hover { color: var(--ink); background: var(--wash); }
+.partager.fait { color: var(--texte-gain); }
+.texte-partage { width: 100%; min-width: 320px; font: inherit; font-size: 12px; margin-top: 6px; }
+.gain-txt { color: var(--texte-gain); } .perte-txt { color: var(--texte-perte); }
+.vide { color: var(--muted); padding: 32px 0; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Mon PEA</h1>
+    <p class="sous-titre" id="sous-titre"></p>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Chiffres clés"></section>
+
+  <div class="filtres" role="group" aria-label="Période des graphiques d'évolution">
+    <span class="label">Période</span>
+    <div class="segments" id="periodes">
+      <button data-periode="1s">1 semaine</button><button data-periode="1m">1 mois</button>
+      <button data-periode="3m">3 mois</button><button data-periode="6m">6 mois</button>
+      <button data-periode="12m">1 an</button><button data-periode="tout">Tout</button>
+    </div>
+  </div>
+
+  <section class="carte">
+    <h2>Valorisation et montant investi</h2>
+    <p class="note">Valorisation à la clôture, comparée au coût de revient des titres détenus (frais inclus).</p>
+    <div class="legende">
+      <span><i class="cle-ligne" style="background:var(--serie)"></i>Valorisation</span>
+      <span><i class="cle-ligne" style="background:var(--contexte)"></i>Montant investi</span>
+    </div>
+    <div class="graphe" id="g-valorisation"></div>
+  </section>
+
+  <section class="carte">
+    <h2>Plus-value latente</h2>
+    <p class="note">Valorisation moins montant investi : au-dessus de zéro en bleu, en dessous en rouge.</p>
+    <div class="graphe" id="g-plus-value"></div>
+    <details>
+      <summary>Voir les données jour par jour</summary>
+      <div class="defile"><table id="t-historique"></table></div>
+    </details>
+  </section>
+
+  <div class="grille">
+    <section class="carte">
+      <h2>Performance par ligne</h2>
+      <p class="note">Dernier cours rapporté au PRU, frais inclus.</p>
+      <div class="barres" id="b-performance"></div>
+    </section>
+    <section class="carte">
+      <h2>Poids dans le portefeuille</h2>
+      <p class="note">Part de chaque ligne dans la valorisation.</p>
+      <div class="barres" id="b-poids"></div>
+    </section>
+  </div>
+
+  <div class="grille">
+    <section class="carte">
+      <h2>Répartition par secteur</h2>
+      <p class="note">Part de la valorisation, secteurs Yahoo Finance.</p>
+      <div class="barres" id="b-secteurs"></div>
+    </section>
+    <section class="carte">
+      <h2>Répartition par pays</h2>
+      <p class="note">Pays d'immatriculation de la société (préfixe de l'ISIN).</p>
+      <div class="barres" id="b-pays"></div>
+    </section>
+  </div>
+
+  <section class="carte">
+    <h2>Positions</h2>
+    <p class="note">Cliquer sur un en-tête pour trier.</p>
+    <div class="defile"><table id="t-positions"></table></div>
+  </section>
+
+  <section class="carte">
+    <h2>Transactions</h2>
+    <details>
+      <summary id="resume-transactions"></summary>
+      <div class="defile"><table id="t-transactions"></table></div>
+    </details>
+  </section>
+</main>
+<div class="infobulle" id="infobulle" role="status"></div>
+
+<script>
+const D = {"genere_le": "30/09/2026 à 18:30", "historique": [{"date": "2025-10-02", "montant_investi": 2691.01, "valorisation": 2667.0, "plus_value_latente": -24.01, "plus_value_realisee": 0.0}, {"date": "2025-10-03", "montant_investi": 2691.01, "valorisation": 2697.34, "plus_value_latente": 6.33, "plus_value_realisee": 0.0}, {"date": "2025-10-06", "montant_investi": 2691.01, "valorisation": 2740.38, "plus_value_latente": 49.37, "plus_value_realisee": 0.0}, {"date": "2025-10-07", "montant_investi": 2691.01, "valorisation": 2713.9, "plus_value_latente": 22.89, "plus_value_realisee": 0.0}, {"date": "2025-10-08", "montant_investi": 2691.01, "valorisation": 2685.36, "plus_value_latente": -5.65, "plus_value_realisee": 0.0}, {"date": "2025-10-09", "montant_investi": 4743.7, "valorisation": 4704.2, "plus_value_latente": -39.5, "plus_value_realisee": 0.0}, {"date": "2025-10-10", "montant_investi": 4743.7, "valorisation": 4620.61, "plus_value_latente": -123.09, "plus_value_realisee": 0.0}, {"date": "2025-10-13", "montant_investi": 4743.7, "valorisation": 4612.1, "plus_value_latente": -131.6, "plus_value_realisee": 0.0}, {"date": "2025-10-14", "montant_investi": 4743.7, "valorisation": 4472.83, "plus_value_latente": -270.87, "plus_value_realisee": 0.0}, {"date": "2025-10-15", "montant_investi": 4743.7, "valorisation": 4488.37, "plus_value_latente": -255.33, "plus_value_realisee": 0.0}, {"date": "2025-10-16", "montant_investi": 6129.89, "valorisation": 5852.62, "plus_value_latente": -277.27, "plus_value_realisee": 0.0}, {"date": "2025-10-17", "montant_investi": 6129.89, "valorisation": 5905.58, "plus_value_latente": -224.31, "plus_value_realisee": 0.0}, {"date": "2025-10-20", "montant_investi": 6129.89, "valorisation": 5924.89, "plus_value_latente": -205.0, "plus_value_realisee": 0.0}, {"date": "2025-10-21", "montant_investi": 6129.89, "valorisation": 5998.94, "plus_value_latente": -130.95, "plus_value_realisee": 0.0}, {"date": "2025-10-22", "montant_investi": 6129.89, "valorisation": 6056.28, "plus_value_latente": -73.61, "plus_value_realisee": 0.0}, {"date": "2025-10-23", "montant_investi": 6129.89, "valorisation": 6005.4, "plus_value_latente": -124.49, "plus_value_realisee": 0.0}, {"date": "2025-10-24", "montant_investi": 6129.89, "valorisation": 6068.34, "plus_value_latente": -61.55, "plus_value_realisee": 0.0}, {"date": "2025-10-27", "montant_investi": 6129.89, "valorisation": 6061.06, "plus_value_latente": -68.83, "plus_value_realisee": 0.0}, {"date": "2025-10-28", "montant_investi": 6129.89, "valorisation": 6115.65, "plus_value_latente": -14.24, "plus_value_realisee": 0.0}, {"date": "2025-10-29", "montant_investi": 6129.89, "valorisation": 6143.61, "plus_value_latente": 13.72, "plus_value_realisee": 0.0}, {"date": "2025-10-30", "montant_investi": 6129.89, "valorisation": 6066.85, "plus_value_latente": -63.04, "plus_value_realisee": 0.0}, {"date": "2025-10-31", "montant_investi": 6129.89, "valorisation": 6158.56, "plus_value_latente": 28.67, "plus_value_realisee": 0.0}, {"date": "2025-11-03", "montant_investi": 6129.89, "valorisation": 6157.51, "plus_value_latente": 27.62, "plus_value_realisee": 0.0}, {"date": "2025-11-04", "montant_investi": 7700.68, "valorisation": 7749.73, "plus_value_latente": 49.05, "plus_value_realisee": 0.0}, {"date": "2025-11-05", "montant_investi": 7700.68, "valorisation": 7698.66, "plus_value_latente": -2.02, "plus_value_realisee": 0.0}, {"date": "2025-11-06", "montant_investi": 7700.68, "valorisation": 7644.45, "plus_value_latente": -56.23, "plus_value_realisee": 0.0}, {"date": "2025-11-07", "montant_investi": 7700.68, "valorisation": 7621.24, "plus_value_latente": -79.44, "plus_value_realisee": 0.0}, {"date": "2025-11-10", "montant_investi": 7700.68, "valorisation": 7600.04, "plus_value_latente": -100.64, "plus_value_realisee": 0.0}, {"date": "2025-11-11", "montant_investi": 7700.68, "valorisation": 7609.45, "plus_value_latente": -91.23, "plus_value_realisee": 0.0}, {"date": "2025-11-12", "montant_investi": 7700.68, "valorisation": 7632.97, "plus_value_latente": -67.71, "plus_value_realisee": 0.0}, {"date": "2025-11-13", "montant_investi": 7700.68, "valorisation": 7615.52, "plus_value_latente": -85.16, "plus_value_realisee": 0.0}, {"date": "2025-11-14", "montant_investi": 7700.68, "valorisation": 7670.12, "plus_value_latente": -30.56, "plus_value_realisee": 0.0}, {"date": "2025-11-17", "montant_investi": 7700.68, "valorisation": 7649.04, "plus_value_latente": -51.64, "plus_value_realisee": 0.0}, {"date": "2025-11-18", "montant_investi": 8840.65, "valorisation": 8760.15, "plus_value_latente": -80.5, "plus_value_realisee": 0.0}, {"date": "2025-11-19", "montant_investi": 8840.65, "valorisation": 8752.67, "plus_value_latente": -87.98, "plus_value_realisee": 0.0}, {"date": "2025-11-20", "montant_investi": 8840.65, "valorisation": 8754.75, "plus_value_latente": -85.9, "plus_value_realisee": 0.0}, {"date": "2025-11-21", "montant_investi": 8840.65, "valorisation": 8769.76, "plus_value_latente": -70.89, "plus_value_realisee": 0.0}, {"date": "2025-11-24", "montant_investi": 8840.65, "valorisation": 8883.92, "plus_value_latente": 43.27, "plus_value_realisee": 0.0}, {"date": "2025-11-25", "montant_investi": 8840.65, "valorisation": 8953.11, "plus_value_latente": 112.46, "plus_value_realisee": 0.0}, {"date": "2025-11-26", "montant_investi": 8840.65, "valorisation": 8922.76, "plus_value_latente": 82.11, "plus_value_realisee": 0.0}, {"date": "2025-11-27", "montant_investi": 8840.65, "valorisation": 8960.8, "plus_value_latente": 120.15, "plus_value_realisee": 0.0}, {"date": "2025-11-28", "montant_investi": 8840.65, "valorisation": 9005.19, "plus_value_latente": 164.54, "plus_value_realisee": 0.0}, {"date": "2025-12-01", "montant_investi": 8840.65, "valorisation": 9120.59, "plus_value_latente": 279.94, "plus_value_realisee": 0.0}, {"date": "2025-12-02", "montant_investi": 9944.46, "valorisation": 10134.48, "plus_value_latente": 190.02, "plus_value_realisee": 0.0}, {"date": "2025-12-03", "montant_investi": 9944.46, "valorisation": 10109.79, "plus_value_latente": 165.33, "plus_value_realisee": 0.0}, {"date": "2025-12-04", "montant_investi": 9944.46, "valorisation": 10102.4, "plus_value_latente": 157.94, "plus_value_realisee": 0.0}, {"date": "2025-12-05", "montant_investi": 9944.46, "valorisation": 10152.06, "plus_value_latente": 207.6, "plus_value_realisee": 0.0}, {"date": "2025-12-08", "montant_investi": 9944.46, "valorisation": 10074.58, "plus_value_latente": 130.12, "plus_value_realisee": 0.0}, {"date": "2025-12-09", "montant_investi": 9944.46, "valorisation": 9979.83, "plus_value_latente": 35.37, "plus_value_realisee": 0.0}, {"date": "2025-12-10", "montant_investi": 9944.46, "valorisation": 9982.58, "plus_value_latente": 38.12, "plus_value_realisee": 0.0}, {"date": "2025-12-11", "montant_investi": 9944.46, "valorisation": 9902.74, "plus_value_latente": -41.72, "plus_value_realisee": 0.0}, {"date": "2025-12-12", "montant_investi": 9944.46, "valorisation": 9883.58, "plus_value_latente": -60.88, "plus_value_realisee": 0.0}, {"date": "2025-12-15", "montant_investi": 11574.14, "valorisation": 11501.89, "plus_value_latente": -72.25, "plus_value_realisee": 0.0}, {"date": "2025-12-16", "montant_investi": 11574.14, "valorisation": 11528.1, "plus_value_latente": -46.04, "plus_value_realisee": 0.0}, {"date": "2025-12-17", "montant_investi": 11574.14, "valorisation": 11512.3, "plus_value_latente": -61.84, "plus_value_realisee": 0.0}, {"date": "2025-12-18", "montant_investi": 11574.14, "valorisation": 11610.95, "plus_value_latente": 36.81, "plus_value_realisee": 0.0}, {"date": "2025-12-19", "montant_investi": 11574.14, "valorisation": 11553.55, "plus_value_latente": -20.59, "plus_value_realisee": 0.0}, {"date": "2025-12-22", "montant_investi": 11574.14, "valorisation": 11511.09, "plus_value_latente": -63.05, "plus_value_realisee": 0.0}, {"date": "2025-12-23", "montant_investi": 11574.14, "valorisation": 11475.29, "plus_value_latente": -98.85, "plus_value_realisee": 0.0}, {"date": "2025-12-24", "montant_investi": 11574.14, "valorisation": 11499.77, "plus_value_latente": -74.37, "plus_value_realisee": 0.0}, {"date": "2025-12-25", "montant_investi": 11574.14, "valorisation": 11497.36, "plus_value_latente": -76.78, "plus_value_realisee": 0.0}, {"date": "2025-12-26", "montant_investi": 11574.14, "valorisation": 11558.59, "plus_value_latente": -15.55, "plus_value_realisee": 0.0}, {"date": "2025-12-29", "montant_investi": 11574.14, "valorisation": 11585.63, "plus_value_latente": 11.49, "plus_value_realisee": 0.0}, {"date": "2025-12-30", "montant_investi": 11574.14, "valorisation": 11542.4, "plus_value_latente": -31.74, "plus_value_realisee": 0.0}, {"date": "2025-12-31", "montant_investi": 11574.14, "valorisation": 11514.11, "plus_value_latente": -60.03, "plus_value_realisee": 0.0}, {"date": "2026-01-01", "montant_investi": 11574.14, "valorisation": 11562.42, "plus_value_latente": -11.72, "plus_value_realisee": 0.0}, {"date": "2026-01-02", "montant_investi": 11574.14, "valorisation": 11533.5, "plus_value_latente": -40.64, "plus_value_realisee": 0.0}, {"date": "2026-01-05", "montant_investi": 11574.14, "valorisation": 11633.52, "plus_value_latente": 59.38, "plus_value_realisee": 0.0}, {"date": "2026-01-06", "montant_investi": 11574.14, "valorisation": 11614.18, "plus_value_latente": 40.04, "plus_value_realisee": 0.0}, {"date": "2026-01-07", "montant_investi": 11574.14, "valorisation": 11631.52, "plus_value_latente": 57.38, "plus_value_realisee": 0.0}, {"date": "2026-01-08", "montant_investi": 12860.51, "valorisation": 12936.43, "plus_value_latente": 75.92, "plus_value_realisee": 0.0}, {"date": "2026-01-09", "montant_investi": 12860.51, "valorisation": 12870.6, "plus_value_latente": 10.09, "plus_value_realisee": 0.0}, {"date": "2026-01-12", "montant_investi": 12860.51, "valorisation": 12915.94, "plus_value_latente": 55.43, "plus_value_realisee": 0.0}, {"date": "2026-01-13", "montant_investi": 12860.51, "valorisation": 12946.93, "plus_value_latente": 86.42, "plus_value_realisee": 0.0}, {"date": "2026-01-14", "montant_investi": 12860.51, "valorisation": 12975.3, "plus_value_latente": 114.79, "plus_value_realisee": 0.0}, {"date": "2026-01-15", "montant_investi": 12860.51, "valorisation": 13007.03, "plus_value_latente": 146.52, "plus_value_realisee": 0.0}, {"date": "2026-01-16", "montant_investi": 12860.51, "valorisation": 13041.72, "plus_value_latente": 181.21, "plus_value_realisee": 0.0}, {"date": "2026-01-19", "montant_investi": 12860.51, "valorisation": 13053.59, "plus_value_latente": 193.08, "plus_value_realisee": 0.0}, {"date": "2026-01-20", "montant_investi": 12860.51, "valorisation": 13155.29, "plus_value_latente": 294.78, "plus_value_realisee": 0.0}, {"date": "2026-01-21", "montant_investi": 12860.51, "valorisation": 13055.03, "plus_value_latente": 194.52, "plus_value_realisee": 0.0}, {"date": "2026-01-22", "montant_investi": 14390.91, "valorisation": 14575.0, "plus_value_latente": 184.09, "plus_value_realisee": 0.0}, {"date": "2026-01-23", "montant_investi": 14390.91, "valorisation": 14530.7, "plus_value_latente": 139.79, "plus_value_realisee": 0.0}, {"date": "2026-01-26", "montant_investi": 14390.91, "valorisation": 14529.95, "plus_value_latente": 139.04, "plus_value_realisee": 0.0}, {"date": "2026-01-27", "montant_investi": 14390.91, "valorisation": 14568.12, "plus_value_latente": 177.21, "plus_value_realisee": 0.0}, {"date": "2026-01-28", "montant_investi": 14390.91, "valorisation": 14546.95, "plus_value_latente": 156.04, "plus_value_realisee": 0.0}, {"date": "2026-01-29", "montant_investi": 14390.91, "valorisation": 14515.75, "plus_value_latente": 124.84, "plus_value_realisee": 0.0}, {"date": "2026-01-30", "montant_investi": 14390.91, "valorisation": 14634.62, "plus_value_latente": 243.71, "plus_value_realisee": 0.0}, {"date": "2026-02-02", "montant_investi": 14390.91, "valorisation": 14613.99, "plus_value_latente": 223.08, "plus_value_realisee": 0.0}, {"date": "2026-02-03", "montant_investi": 14390.91, "valorisation": 14723.03, "plus_value_latente": 332.12, "plus_value_realisee": 0.0}, {"date": "2026-02-04", "montant_investi": 14390.91, "valorisation": 14761.31, "plus_value_latente": 370.4, "plus_value_realisee": 0.0}, {"date": "2026-02-05", "montant_investi": 15368.62, "valorisation": 15876.08, "plus_value_latente": 507.46, "plus_value_realisee": 0.0}, {"date": "2026-02-06", "montant_investi": 15368.62, "valorisation": 15826.61, "plus_value_latente": 457.99, "plus_value_realisee": 0.0}, {"date": "2026-02-09", "montant_investi": 15368.62, "valorisation": 15774.33, "plus_value_latente": 405.71, "plus_value_realisee": 0.0}, {"date": "2026-02-10", "montant_investi": 15368.62, "valorisation": 15694.27, "plus_value_latente": 325.65, "plus_value_realisee": 0.0}, {"date": "2026-02-11", "montant_investi": 15368.62, "valorisation": 15792.27, "plus_value_latente": 423.65, "plus_value_realisee": 0.0}, {"date": "2026-02-12", "montant_investi": 15368.62, "valorisation": 15770.56, "plus_value_latente": 401.94, "plus_value_realisee": 0.0}, {"date": "2026-02-13", "montant_investi": 15368.62, "valorisation": 15861.01, "plus_value_latente": 492.39, "plus_value_realisee": 0.0}, {"date": "2026-02-16", "montant_investi": 15368.62, "valorisation": 15929.65, "plus_value_latente": 561.03, "plus_value_realisee": 0.0}, {"date": "2026-02-17", "montant_investi": 15368.62, "valorisation": 15936.93, "plus_value_latente": 568.31, "plus_value_realisee": 0.0}, {"date": "2026-02-18", "montant_investi": 15368.62, "valorisation": 15917.29, "plus_value_latente": 548.67, "plus_value_realisee": 0.0}, {"date": "2026-02-19", "montant_investi": 16563.42, "valorisation": 17184.06, "plus_value_latente": 620.64, "plus_value_realisee": 0.0}, {"date": "2026-02-20", "montant_investi": 16563.42, "valorisation": 17123.55, "plus_value_latente": 560.13, "plus_value_realisee": 0.0}, {"date": "2026-02-23", "montant_investi": 16563.42, "valorisation": 17135.18, "plus_value_latente": 571.76, "plus_value_realisee": 0.0}, {"date": "2026-02-24", "montant_investi": 16563.42, "valorisation": 17178.47, "plus_value_latente": 615.05, "plus_value_realisee": 0.0}, {"date": "2026-02-25", "montant_investi": 16563.42, "valorisation": 17178.06, "plus_value_latente": 614.64, "plus_value_realisee": 0.0}, {"date": "2026-02-26", "montant_investi": 16563.42, "valorisation": 17199.92, "plus_value_latente": 636.5, "plus_value_realisee": 0.0}, {"date": "2026-02-27", "montant_investi": 16563.42, "valorisation": 17278.28, "plus_value_latente": 714.86, "plus_value_realisee": 0.0}, {"date": "2026-03-02", "montant_investi": 16563.42, "valorisation": 17253.46, "plus_value_latente": 690.04, "plus_value_realisee": 0.0}, {"date": "2026-03-03", "montant_investi": 16563.42, "valorisation": 17217.74, "plus_value_latente": 654.32, "plus_value_realisee": 0.0}, {"date": "2026-03-04", "montant_investi": 16563.42, "valorisation": 17181.8, "plus_value_latente": 618.38, "plus_value_realisee": 0.0}, {"date": "2026-03-05", "montant_investi": 16563.42, "valorisation": 17220.22, "plus_value_latente": 656.8, "plus_value_realisee": 0.0}, {"date": "2026-03-06", "montant_investi": 16563.42, "valorisation": 17114.25, "plus_value_latente": 550.83, "plus_value_realisee": 0.0}, {"date": "2026-03-09", "montant_investi": 16563.42, "valorisation": 17082.45, "plus_value_latente": 519.03, "plus_value_realisee": 0.0}, {"date": "2026-03-10", "montant_investi": 17888.0, "valorisation": 18376.07, "plus_value_latente": 488.07, "plus_value_realisee": 0.0}, {"date": "2026-03-11", "montant_investi": 17888.0, "valorisation": 18393.27, "plus_value_latente": 505.27, "plus_value_realisee": 0.0}, {"date": "2026-03-12", "montant_investi": 17888.0, "valorisation": 18311.58, "plus_value_latente": 423.58, "plus_value_realisee": 0.0}, {"date": "2026-03-13", "montant_investi": 17888.0, "valorisation": 18385.23, "plus_value_latente": 497.23, "plus_value_realisee": 0.0}, {"date": "2026-03-16", "montant_investi": 17888.0, "valorisation": 18467.33, "plus_value_latente": 579.33, "plus_value_realisee": 0.0}, {"date": "2026-03-17", "montant_investi": 17888.0, "valorisation": 18552.39, "plus_value_latente": 664.39, "plus_value_realisee": 0.0}, {"date": "2026-03-18", "montant_investi": 17888.0, "valorisation": 18440.96, "plus_value_latente": 552.96, "plus_value_realisee": 0.0}, {"date": "2026-03-19", "montant_investi": 17888.0, "valorisation": 18423.33, "plus_value_latente": 535.33, "plus_value_realisee": 0.0}, {"date": "2026-03-20", "montant_investi": 17888.0, "valorisation": 18319.79, "plus_value_latente": 431.79, "plus_value_realisee": 0.0}, {"date": "2026-03-23", "montant_investi": 17888.0, "valorisation": 18093.07, "plus_value_latente": 205.07, "plus_value_realisee": 0.0}, {"date": "2026-03-24", "montant_investi": 17888.0, "valorisation": 18071.4, "plus_value_latente": 183.4, "plus_value_realisee": 0.0}, {"date": "2026-03-25", "montant_investi": 17888.0, "valorisation": 18052.77, "plus_value_latente": 164.77, "plus_value_realisee": 0.0}, {"date": "2026-03-26", "montant_investi": 17888.0, "valorisation": 18219.74, "plus_value_latente": 331.74, "plus_value_realisee": 0.0}, {"date": "2026-03-27", "montant_investi": 17888.0, "valorisation": 18257.61, "plus_value_latente": 369.61, "plus_value_realisee": 0.0}, {"date": "2026-03-30", "montant_investi": 17888.0, "valorisation": 18441.67, "plus_value_latente": 553.67, "plus_value_realisee": 0.0}, {"date": "2026-03-31", "montant_investi": 17888.0, "valorisation": 18414.68, "plus_value_latente": 526.68, "plus_value_realisee": 0.0}, {"date": "2026-04-01", "montant_investi": 17888.0, "valorisation": 18524.22, "plus_value_latente": 636.22, "plus_value_realisee": 0.0}, {"date": "2026-04-02", "montant_investi": 17888.0, "valorisation": 18468.25, "plus_value_latente": 580.25, "plus_value_realisee": 0.0}, {"date": "2026-04-03", "montant_investi": 17888.0, "valorisation": 18599.28, "plus_value_latente": 711.28, "plus_value_realisee": 0.0}, {"date": "2026-04-06", "montant_investi": 17888.0, "valorisation": 18657.05, "plus_value_latente": 769.05, "plus_value_realisee": 0.0}, {"date": "2026-04-07", "montant_investi": 17278.76, "valorisation": 18019.76, "plus_value_latente": 741.0, "plus_value_realisee": 90.28}, {"date": "2026-04-08", "montant_investi": 17278.76, "valorisation": 17948.54, "plus_value_latente": 669.79, "plus_value_realisee": 90.28}, {"date": "2026-04-09", "montant_investi": 17278.76, "valorisation": 18070.46, "plus_value_latente": 791.71, "plus_value_realisee": 90.28}, {"date": "2026-04-10", "montant_investi": 17278.76, "valorisation": 18097.02, "plus_value_latente": 818.27, "plus_value_realisee": 90.28}, {"date": "2026-04-13", "montant_investi": 17278.76, "valorisation": 18055.93, "plus_value_latente": 777.17, "plus_value_realisee": 90.28}, {"date": "2026-04-14", "montant_investi": 17278.76, "valorisation": 18148.84, "plus_value_latente": 870.08, "plus_value_realisee": 90.28}, {"date": "2026-04-15", "montant_investi": 17278.76, "valorisation": 18133.21, "plus_value_latente": 854.45, "plus_value_realisee": 90.28}, {"date": "2026-04-16", "montant_investi": 17278.76, "valorisation": 18051.59, "plus_value_latente": 772.84, "plus_value_realisee": 90.28}, {"date": "2026-04-17", "montant_investi": 17278.76, "valorisation": 18080.54, "plus_value_latente": 801.78, "plus_value_realisee": 90.28}, {"date": "2026-04-20", "montant_investi": 17278.76, "valorisation": 17975.3, "plus_value_latente": 696.55, "plus_value_realisee": 90.28}, {"date": "2026-04-21", "montant_investi": 18192.14, "valorisation": 18992.02, "plus_value_latente": 799.87, "plus_value_realisee": 90.28}, {"date": "2026-04-22", "montant_investi": 18192.14, "valorisation": 18831.67, "plus_value_latente": 639.53, "plus_value_realisee": 90.28}, {"date": "2026-04-23", "montant_investi": 18192.14, "valorisation": 18879.2, "plus_value_latente": 687.06, "plus_value_realisee": 90.28}, {"date": "2026-04-24", "montant_investi": 18192.14, "valorisation": 18982.38, "plus_value_latente": 790.24, "plus_value_realisee": 90.28}, {"date": "2026-04-27", "montant_investi": 18192.14, "valorisation": 19054.74, "plus_value_latente": 862.59, "plus_value_realisee": 90.28}, {"date": "2026-04-28", "montant_investi": 18192.14, "valorisation": 19126.19, "plus_value_latente": 934.05, "plus_value_realisee": 90.28}, {"date": "2026-04-29", "montant_investi": 18192.14, "valorisation": 19147.14, "plus_value_latente": 955.0, "plus_value_realisee": 90.28}, {"date": "2026-04-30", "montant_investi": 18192.14, "valorisation": 19194.95, "plus_value_latente": 1002.8, "plus_value_realisee": 90.28}, {"date": "2026-05-01", "montant_investi": 18192.14, "valorisation": 19213.02, "plus_value_latente": 1020.87, "plus_value_realisee": 90.28}, {"date": "2026-05-04", "montant_investi": 18192.14, "valorisation": 19380.19, "plus_value_latente": 1188.04, "plus_value_realisee": 90.28}, {"date": "2026-05-05", "montant_investi": 18192.14, "valorisation": 19365.34, "plus_value_latente": 1173.2, "plus_value_realisee": 90.28}, {"date": "2026-05-06", "montant_investi": 18192.14, "valorisation": 19340.98, "plus_value_latente": 1148.84, "plus_value_realisee": 90.28}, {"date": "2026-05-07", "montant_investi": 18192.14, "valorisation": 19404.34, "plus_value_latente": 1212.19, "plus_value_realisee": 90.28}, {"date": "2026-05-08", "montant_investi": 18192.14, "valorisation": 19428.89, "plus_value_latente": 1236.74, "plus_value_realisee": 90.28}, {"date": "2026-05-11", "montant_investi": 18192.14, "valorisation": 19347.25, "plus_value_latente": 1155.1, "plus_value_realisee": 90.28}, {"date": "2026-05-12", "montant_investi": 19220.6, "valorisation": 20378.56, "plus_value_latente": 1157.96, "plus_value_realisee": 90.28}, {"date": "2026-05-13", "montant_investi": 19220.6, "valorisation": 20467.27, "plus_value_latente": 1246.66, "plus_value_realisee": 90.28}, {"date": "2026-05-14", "montant_investi": 19220.6, "valorisation": 20425.61, "plus_value_latente": 1205.0, "plus_value_realisee": 90.28}, {"date": "2026-05-15", "montant_investi": 19220.6, "valorisation": 20647.87, "plus_value_latente": 1427.26, "plus_value_realisee": 90.28}, {"date": "2026-05-18", "montant_investi": 19220.6, "valorisation": 20780.51, "plus_value_latente": 1559.91, "plus_value_realisee": 90.28}, {"date": "2026-05-19", "montant_investi": 19220.6, "valorisation": 20785.01, "plus_value_latente": 1564.4, "plus_value_realisee": 90.28}, {"date": "2026-05-20", "montant_investi": 19220.6, "valorisation": 20789.07, "plus_value_latente": 1568.46, "plus_value_realisee": 90.28}, {"date": "2026-05-21", "montant_investi": 19220.6, "valorisation": 20614.87, "plus_value_latente": 1394.26, "plus_value_realisee": 90.28}, {"date": "2026-05-22", "montant_investi": 19220.6, "valorisation": 20769.58, "plus_value_latente": 1548.98, "plus_value_realisee": 90.28}, {"date": "2026-05-25", "montant_investi": 19220.6, "valorisation": 20677.39, "plus_value_latente": 1456.78, "plus_value_realisee": 90.28}, {"date": "2026-05-26", "montant_investi": 19220.6, "valorisation": 20758.89, "plus_value_latente": 1538.28, "plus_value_realisee": 90.28}, {"date": "2026-05-27", "montant_investi": 19220.6, "valorisation": 20753.36, "plus_value_latente": 1532.76, "plus_value_realisee": 90.28}, {"date": "2026-05-28", "montant_investi": 19220.6, "valorisation": 20728.2, "plus_value_latente": 1507.6, "plus_value_realisee": 90.28}, {"date": "2026-05-29", "montant_investi": 19220.6, "valorisation": 20671.15, "plus_value_latente": 1450.55, "plus_value_realisee": 90.28}, {"date": "2026-06-01", "montant_investi": 19220.6, "valorisation": 20665.14, "plus_value_latente": 1444.54, "plus_value_realisee": 90.28}, {"date": "2026-06-02", "montant_investi": 19220.6, "valorisation": 20724.17, "plus_value_latente": 1503.57, "plus_value_realisee": 90.28}, {"date": "2026-06-03", "montant_investi": 19991.44, "valorisation": 21546.98, "plus_value_latente": 1555.54, "plus_value_realisee": 90.28}, {"date": "2026-06-04", "montant_investi": 19991.44, "valorisation": 21448.6, "plus_value_latente": 1457.16, "plus_value_realisee": 90.28}, {"date": "2026-06-05", "montant_investi": 19991.44, "valorisation": 21455.03, "plus_value_latente": 1463.58, "plus_value_realisee": 90.28}, {"date": "2026-06-08", "montant_investi": 19991.44, "valorisation": 21449.01, "plus_value_latente": 1457.56, "plus_value_realisee": 90.28}, {"date": "2026-06-09", "montant_investi": 19991.44, "valorisation": 21438.32, "plus_value_latente": 1446.87, "plus_value_realisee": 90.28}, {"date": "2026-06-10", "montant_investi": 19991.44, "valorisation": 21360.5, "plus_value_latente": 1369.05, "plus_value_realisee": 90.28}, {"date": "2026-06-11", "montant_investi": 19991.44, "valorisation": 21352.68, "plus_value_latente": 1361.24, "plus_value_realisee": 90.28}, {"date": "2026-06-12", "montant_investi": 19991.44, "valorisation": 21347.77, "plus_value_latente": 1356.33, "plus_value_realisee": 90.28}, {"date": "2026-06-15", "montant_investi": 19991.44, "valorisation": 21287.96, "plus_value_latente": 1296.51, "plus_value_realisee": 90.28}, {"date": "2026-06-16", "montant_investi": 19991.44, "valorisation": 21212.54, "plus_value_latente": 1221.09, "plus_value_realisee": 90.28}, {"date": "2026-06-17", "montant_investi": 19991.44, "valorisation": 21326.23, "plus_value_latente": 1334.78, "plus_value_realisee": 90.28}, {"date": "2026-06-18", "montant_investi": 19991.44, "valorisation": 21315.29, "plus_value_latente": 1323.84, "plus_value_realisee": 90.28}, {"date": "2026-06-19", "montant_investi": 19991.44, "valorisation": 21364.14, "plus_value_latente": 1372.69, "plus_value_realisee": 90.28}, {"date": "2026-06-22", "montant_investi": 19991.44, "valorisation": 21501.07, "plus_value_latente": 1509.62, "plus_value_realisee": 90.28}, {"date": "2026-06-23", "montant_investi": 19991.44, "valorisation": 21546.71, "plus_value_latente": 1555.27, "plus_value_realisee": 90.28}, {"date": "2026-06-24", "montant_investi": 20795.02, "valorisation": 22395.43, "plus_value_latente": 1600.42, "plus_value_realisee": 90.28}, {"date": "2026-06-25", "montant_investi": 20795.02, "valorisation": 22386.66, "plus_value_latente": 1591.64, "plus_value_realisee": 90.28}, {"date": "2026-06-26", "montant_investi": 20795.02, "valorisation": 22262.13, "plus_value_latente": 1467.11, "plus_value_realisee": 90.28}, {"date": "2026-06-29", "montant_investi": 20795.02, "valorisation": 22199.99, "plus_value_latente": 1404.98, "plus_value_realisee": 90.28}, {"date": "2026-06-30", "montant_investi": 20795.02, "valorisation": 22412.36, "plus_value_latente": 1617.35, "plus_value_realisee": 90.28}, {"date": "2026-07-01", "montant_investi": 20795.02, "valorisation": 22486.95, "plus_value_latente": 1691.94, "plus_value_realisee": 90.28}, {"date": "2026-07-02", "montant_investi": 20795.02, "valorisation": 22595.45, "plus_value_latente": 1800.44, "plus_value_realisee": 90.28}, {"date": "2026-07-03", "montant_investi": 20795.02, "valorisation": 22696.34, "plus_value_latente": 1901.33, "plus_value_realisee": 90.28}, {"date": "2026-07-06", "montant_investi": 20795.02, "valorisation": 22597.83, "plus_value_latente": 1802.82, "plus_value_realisee": 90.28}, {"date": "2026-07-07", "montant_investi": 20795.02, "valorisation": 22560.2, "plus_value_latente": 1765.18, "plus_value_realisee": 90.28}, {"date": "2026-07-08", "montant_investi": 20795.02, "valorisation": 22676.07, "plus_value_latente": 1881.06, "plus_value_realisee": 90.28}, {"date": "2026-07-09", "montant_investi": 20795.02, "valorisation": 22660.05, "plus_value_latente": 1865.03, "plus_value_realisee": 90.28}, {"date": "2026-07-10", "montant_investi": 20795.02, "valorisation": 22799.62, "plus_value_latente": 2004.61, "plus_value_realisee": 90.28}, {"date": "2026-07-13", "montant_investi": 20795.02, "valorisation": 22990.96, "plus_value_latente": 2195.94, "plus_value_realisee": 90.28}, {"date": "2026-07-14", "montant_investi": 20795.02, "valorisation": 23111.98, "plus_value_latente": 2316.96, "plus_value_realisee": 90.28}, {"date": "2026-07-15", "montant_investi": 21736.42, "valorisation": 24140.73, "plus_value_latente": 2404.32, "plus_value_realisee": 90.28}, {"date": "2026-07-16", "montant_investi": 21736.42, "valorisation": 24075.9, "plus_value_latente": 2339.49, "plus_value_realisee": 90.28}, {"date": "2026-07-17", "montant_investi": 21736.42, "valorisation": 24268.68, "plus_value_latente": 2532.26, "plus_value_realisee": 90.28}, {"date": "2026-07-20", "montant_investi": 21736.42, "valorisation": 24063.07, "plus_value_latente": 2326.66, "plus_value_realisee": 90.28}, {"date": "2026-07-21", "montant_investi": 21736.42, "valorisation": 24048.93, "plus_value_latente": 2312.52, "plus_value_realisee": 90.28}, {"date": "2026-07-22", "montant_investi": 21736.42, "valorisation": 24077.21, "plus_value_latente": 2340.79, "plus_value_realisee": 90.28}, {"date": "2026-07-23", "montant_investi": 21736.42, "valorisation": 24138.23, "plus_value_latente": 2401.82, "plus_value_realisee": 90.28}, {"date": "2026-07-24", "montant_investi": 21736.42, "valorisation": 24090.04, "plus_value_latente": 2353.63, "plus_value_realisee": 90.28}, {"date": "2026-07-27", "montant_investi": 21736.42, "valorisation": 23865.72, "plus_value_latente": 2129.31, "plus_value_realisee": 90.28}, {"date": "2026-07-28", "montant_investi": 21736.42, "valorisation": 24014.7, "plus_value_latente": 2278.29, "plus_value_realisee": 90.28}, {"date": "2026-07-29", "montant_investi": 21736.42, "valorisation": 24053.51, "plus_value_latente": 2317.09, "plus_value_realisee": 90.28}, {"date": "2026-07-30", "montant_investi": 21736.42, "valorisation": 24215.69, "plus_value_latente": 2479.27, "plus_value_realisee": 90.28}, {"date": "2026-07-31", "montant_investi": 21736.42, "valorisation": 24113.72, "plus_value_latente": 2377.31, "plus_value_realisee": 90.28}, {"date": "2026-08-03", "montant_investi": 21736.42, "valorisation": 24045.88, "plus_value_latente": 2309.47, "plus_value_realisee": 90.28}, {"date": "2026-08-04", "montant_investi": 21736.42, "valorisation": 24178.32, "plus_value_latente": 2441.91, "plus_value_realisee": 90.28}, {"date": "2026-08-05", "montant_investi": 21736.42, "valorisation": 24217.36, "plus_value_latente": 2480.95, "plus_value_realisee": 90.28}, {"date": "2026-08-06", "montant_investi": 21736.42, "valorisation": 24224.55, "plus_value_latente": 2488.13, "plus_value_realisee": 90.28}, {"date": "2026-08-07", "montant_investi": 21736.42, "valorisation": 24359.56, "plus_value_latente": 2623.14, "plus_value_realisee": 90.28}, {"date": "2026-08-10", "montant_investi": 21736.42, "valorisation": 24487.11, "plus_value_latente": 2750.69, "plus_value_realisee": 90.28}, {"date": "2026-08-11", "montant_investi": 21736.42, "valorisation": 24484.16, "plus_value_latente": 2747.75, "plus_value_realisee": 90.28}, {"date": "2026-08-12", "montant_investi": 21736.42, "valorisation": 24563.82, "plus_value_latente": 2827.41, "plus_value_realisee": 90.28}, {"date": "2026-08-13", "montant_investi": 21736.42, "valorisation": 24527.66, "plus_value_latente": 2791.24, "plus_value_realisee": 90.28}, {"date": "2026-08-14", "montant_investi": 21736.42, "valorisation": 24547.74, "plus_value_latente": 2811.32, "plus_value_realisee": 90.28}, {"date": "2026-08-17", "montant_investi": 21736.42, "valorisation": 24616.95, "plus_value_latente": 2880.53, "plus_value_realisee": 90.28}, {"date": "2026-08-18", "montant_investi": 21736.42, "valorisation": 24488.2, "plus_value_latente": 2751.79, "plus_value_realisee": 90.28}, {"date": "2026-08-19", "montant_investi": 21736.42, "valorisation": 24308.74, "plus_value_latente": 2572.33, "plus_value_realisee": 90.28}, {"date": "2026-08-20", "montant_investi": 21736.42, "valorisation": 24489.25, "plus_value_latente": 2752.83, "plus_value_realisee": 90.28}, {"date": "2026-08-21", "montant_investi": 21736.42, "valorisation": 24558.38, "plus_value_latente": 2821.97, "plus_value_realisee": 90.28}, {"date": "2026-08-24", "montant_investi": 21736.42, "valorisation": 24607.7, "plus_value_latente": 2871.28, "plus_value_realisee": 90.28}, {"date": "2026-08-25", "montant_investi": 21736.42, "valorisation": 24632.45, "plus_value_latente": 2896.04, "plus_value_realisee": 90.28}, {"date": "2026-08-26", "montant_investi": 21736.42, "valorisation": 24674.3, "plus_value_latente": 2937.88, "plus_value_realisee": 90.28}, {"date": "2026-08-27", "montant_investi": 21736.42, "valorisation": 24890.48, "plus_value_latente": 3154.06, "plus_value_realisee": 90.28}, {"date": "2026-08-28", "montant_investi": 21736.42, "valorisation": 24720.62, "plus_value_latente": 2984.21, "plus_value_realisee": 90.28}, {"date": "2026-08-31", "montant_investi": 21736.42, "valorisation": 24778.74, "plus_value_latente": 3042.32, "plus_value_realisee": 90.28}, {"date": "2026-09-01", "montant_investi": 21736.42, "valorisation": 24823.48, "plus_value_latente": 3087.07, "plus_value_realisee": 90.28}, {"date": "2026-09-02", "montant_investi": 21736.42, "valorisation": 24781.24, "plus_value_latente": 3044.82, "plus_value_realisee": 90.28}, {"date": "2026-09-03", "montant_investi": 21736.42, "valorisation": 24946.24, "plus_value_latente": 3209.83, "plus_value_realisee": 90.28}, {"date": "2026-09-04", "montant_investi": 21736.42, "valorisation": 24882.54, "plus_value_latente": 3146.13, "plus_value_realisee": 90.28}, {"date": "2026-09-07", "montant_investi": 21736.42, "valorisation": 25002.14, "plus_value_latente": 3265.73, "plus_value_realisee": 90.28}, {"date": "2026-09-08", "montant_investi": 22763.5, "valorisation": 26099.0, "plus_value_latente": 3335.5, "plus_value_realisee": 90.28}, {"date": "2026-09-09", "montant_investi": 22763.5, "valorisation": 26174.18, "plus_value_latente": 3410.68, "plus_value_realisee": 90.28}, {"date": "2026-09-10", "montant_investi": 22763.5, "valorisation": 26186.31, "plus_value_latente": 3422.82, "plus_value_realisee": 90.28}, {"date": "2026-09-11", "montant_investi": 22763.5, "valorisation": 26171.23, "plus_value_latente": 3407.74, "plus_value_realisee": 90.28}, {"date": "2026-09-14", "montant_investi": 22763.5, "valorisation": 26168.25, "plus_value_latente": 3404.76, "plus_value_realisee": 90.28}, {"date": "2026-09-15", "montant_investi": 22763.5, "valorisation": 26129.38, "plus_value_latente": 3365.88, "plus_value_realisee": 90.28}, {"date": "2026-09-16", "montant_investi": 22763.5, "valorisation": 26226.0, "plus_value_latente": 3462.5, "plus_value_realisee": 90.28}, {"date": "2026-09-17", "montant_investi": 22763.5, "valorisation": 26046.15, "plus_value_latente": 3282.66, "plus_value_realisee": 90.28}, {"date": "2026-09-18", "montant_investi": 22763.5, "valorisation": 26105.26, "plus_value_latente": 3341.77, "plus_value_realisee": 90.28}, {"date": "2026-09-21", "montant_investi": 22763.5, "valorisation": 26014.78, "plus_value_latente": 3251.28, "plus_value_realisee": 90.28}, {"date": "2026-09-22", "montant_investi": 22763.5, "valorisation": 26022.24, "plus_value_latente": 3258.75, "plus_value_realisee": 90.28}, {"date": "2026-09-23", "montant_investi": 22763.5, "valorisation": 26079.43, "plus_value_latente": 3315.94, "plus_value_realisee": 90.28}, {"date": "2026-09-24", "montant_investi": 22763.5, "valorisation": 26316.17, "plus_value_latente": 3552.68, "plus_value_realisee": 90.28}, {"date": "2026-09-25", "montant_investi": 22763.5, "valorisation": 26413.49, "plus_value_latente": 3650.0, "plus_value_realisee": 90.28}, {"date": "2026-09-28", "montant_investi": 22763.5, "valorisation": 26291.8, "plus_value_latente": 3528.3, "plus_value_realisee": 90.28}, {"date": "2026-09-29", "montant_investi": 23762.48, "valorisation": 27238.26, "plus_value_latente": 3475.78, "plus_value_realisee": 90.28}, {"date": "2026-09-30", "montant_investi": 23762.48, "valorisation": 27357.61, "plus_value_latente": 3595.14, "plus_value_realisee": 90.28}], "positions": [{"isin": "NL0010273215", "libelle": "ASML HOLDING", "quantite": 5, "pru": 675.454, "montant_investi": 3377.27, "date_cours": "2026-09-30", "cours": 759.27, "valorisation": 3796.35, "plus_value_latente": 419.08, "plus_value_pct": 12.41, "symbole": "ASML.AS", "secteur": "Technologie", "provisoires": 0, "pays": "Pays-Bas"}, {"isin": "FR0000120073", "libelle": "AIR LIQUIDE", "quantite": 13, "pru": 204.3662, "montant_investi": 2656.76, "date_cours": "2026-09-30", "cours": 282.49, "valorisation": 3672.37, "plus_value_latente": 1015.61, "plus_value_pct": 38.23, "symbole": "AI.PA", "secteur": "Matériaux de base", "provisoires": 0, "pays": "France"}, {"isin": "DE0007164600", "libelle": "SAP SE", "quantite": 11, "pru": 236.2955, "montant_investi": 2599.25, "date_cours": "2026-09-30", "cours": 287.57, "valorisation": 3163.27, "plus_value_latente": 564.02, "plus_value_pct": 21.7, "symbole": "SAP.DE", "secteur": "Technologie", "provisoires": 0, "pays": "Allemagne"}, {"isin": "FR0000131104", "libelle": "BNP PARIBAS ACTIONS A", "quantite": 29, "pru": 76.8197, "montant_investi": 2227.77, "date_cours": "2026-09-30", "cours": 105.91, "valorisation": 3071.39, "plus_value_latente": 843.62, "plus_value_pct": 37.87, "symbole": "BNP.PA", "secteur": "Finance", "provisoires": 0, "pays": "France"}, {"isin": "FR0000120578", "libelle": "SANOFI", "quantite": 21, "pru": 109.5038, "montant_investi": 2299.58, "date_cours": "2026-09-30", "cours": 131.69, "valorisation": 2765.49, "plus_value_latente": 465.91, "plus_value_pct": 20.26, "symbole": "SAN.PA", "secteur": "Santé", "provisoires": 0, "pays": "France"}, {"isin": "DE0008404005", "libelle": "ALLIANZ SE-VNA", "quantite": 7, "pru": 361.34, "montant_investi": 2529.38, "date_cours": "2026-09-30", "cours": 340.49, "valorisation": 2383.43, "plus_value_latente": -145.95, "plus_value_pct": -5.77, "symbole": "ALV.DE", "secteur": "Finance", "provisoires": 1, "pays": "Allemagne"}, {"isin": "ES0144580Y14", "libelle": "IBERDROLA", "quantite": 97, "pru": 12.3175, "montant_investi": 1194.8, "date_cours": "2026-09-30", "cours": 22.51, "valorisation": 2183.47, "plus_value_latente": 988.67, "plus_value_pct": 82.75, "symbole": "IBE.MC", "secteur": "Services aux collectivités", "provisoires": 0, "pays": "Espagne"}, {"isin": "FR0000120271", "libelle": "TOTALENERGIES SE", "quantite": 49, "pru": 50.0047, "montant_investi": 2450.23, "date_cours": "2026-09-30", "cours": 38.67, "valorisation": 1894.83, "plus_value_latente": -555.4, "plus_value_pct": -22.67, "symbole": "TTE.PA", "secteur": "Énergie", "provisoires": 0, "pays": "France"}, {"isin": "FR0000121972", "libelle": "SCHNEIDER ELECTRIC SE", "quantite": 9, "pru": 212.3122, "montant_investi": 1910.81, "date_cours": "2026-09-30", "cours": 209.7, "valorisation": 1887.3, "plus_value_latente": -23.51, "plus_value_pct": -1.23, "symbole": "SU.PA", "secteur": "Industrie", "provisoires": 0, "pays": "France"}, {"isin": "IT0003128367", "libelle": "ENEL", "quantite": 285, "pru": 6.6926, "montant_investi": 1907.38, "date_cours": "2026-09-30", "cours": 5.872, "valorisation": 1673.52, "plus_value_latente": -233.86, "plus_value_pct": -12.26, "symbole": "ENEL.MI", "secteur": "Services aux collectivités", "provisoires": 0, "pays": "Italie"}, {"isin": "FR0000121014", "libelle": "LVMH MOET HENNESSY VUITTON", "quantite": 1, "pru": 609.245, "montant_investi": 609.24, "date_cours": "2026-09-30", "cours": 866.19, "valorisation": 866.19, "plus_value_latente": 256.95, "plus_value_pct": 42.17, "symbole": "MC.PA", "secteur": "Consommation cyclique", "provisoires": 0, "pays": "France"}], "transactions": [{"date_execution": "2026-09-29 12:20:20", "reference": "G260929U1020", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "ALLIANZ SE-VNA", "isin": "DE0008404005", "quantite": 3, "cours": 332.96, "montant_brut": 998.88, "couts": 0.1, "montant_net": 998.98, "provisoire": 1, "qte_avant": 4, "qte_apres": 7, "pru_apres": 361.34, "pv_operation": 0.0}, {"date_execution": "2026-09-08 11:13:07", "reference": "70002603", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "AIR LIQUIDE", "isin": "FR0000120073", "quantite": 4, "cours": 254.48, "montant_brut": 1017.92, "couts": 9.16, "montant_net": 1027.08, "provisoire": 0, "qte_avant": 9, "qte_apres": 13, "pru_apres": 204.3662, "pv_operation": 0.0}, {"date_execution": "2026-07-15 10:06:54", "reference": "70002466", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "BNP PARIBAS ACTIONS A", "isin": "FR0000131104", "quantite": 10, "cours": 93.3, "montant_brut": 933.0, "couts": 8.4, "montant_net": 941.4, "provisoire": 0, "qte_avant": 19, "qte_apres": 29, "pru_apres": 76.8197, "pv_operation": 0.0}, {"date_execution": "2026-06-24 15:59:41", "reference": "G260624U1017", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "ENEL", "isin": "IT0003128367", "quantite": 126, "cours": 6.345, "montant_brut": 799.47, "couts": 4.1, "montant_net": 803.57, "provisoire": 0, "qte_avant": 159, "qte_apres": 285, "pru_apres": 6.6926, "pv_operation": 0.0}, {"date_execution": "2026-06-03 14:52:28", "reference": "70002192", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "SCHNEIDER ELECTRIC SE", "isin": "FR0000121972", "quantite": 4, "cours": 190.99, "montant_brut": 763.96, "couts": 6.88, "montant_net": 770.84, "provisoire": 0, "qte_avant": 5, "qte_apres": 9, "pru_apres": 212.3122, "pv_operation": 0.0}, {"date_execution": "2026-05-12 13:45:15", "reference": "G260512U1015", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "SAP SE", "isin": "DE0007164600", "quantite": 4, "cours": 255.81, "montant_brut": 1023.24, "couts": 5.22, "montant_net": 1028.46, "provisoire": 0, "qte_avant": 7, "qte_apres": 11, "pru_apres": 236.2955, "pv_operation": 0.0}, {"date_execution": "2026-04-21 12:38:02", "reference": "70001918", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "SANOFI", "isin": "FR0000120578", "quantite": 7, "cours": 129.32, "montant_brut": 905.24, "couts": 8.15, "montant_net": 913.39, "provisoire": 0, "qte_avant": 14, "qte_apres": 21, "pru_apres": 109.5038, "pv_operation": 0.0}, {"date_execution": "2026-04-07 11:31:49", "reference": "70001781", "sens": "VENTE", "type_transaction": "Vente au comptant", "libelle": "LVMH MOET HENNESSY VUITTON", "isin": "FR0000121014", "quantite": 1, "cours": 703.04, "montant_brut": 703.04, "couts": 3.52, "montant_net": 699.52, "provisoire": 0, "qte_avant": 2, "qte_apres": 1, "pru_apres": 609.245, "pv_operation": 90.28}, {"date_execution": "2026-03-10 10:24:36", "reference": "G260310U1012", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "ASML HOLDING", "isin": "NL0010273215", "quantite": 2, "cours": 658.93, "montant_brut": 1317.86, "couts": 6.72, "montant_net": 1324.58, "provisoire": 0, "qte_avant": 3, "qte_apres": 5, "pru_apres": 675.454, "pv_operation": 0.0}, {"date_execution": "2026-02-19 15:17:23", "reference": "G260219U1011", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "IBERDROLA", "isin": "ES0144580Y14", "quantite": 97, "cours": 12.255, "montant_brut": 1188.74, "couts": 6.0600000000000005, "montant_net": 1194.8, "provisoire": 0, "qte_avant": 0, "qte_apres": 97, "pru_apres": 12.3175, "pv_operation": 0.0}, {"date_execution": "2026-02-05 14:10:10", "reference": "70001370", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "TOTALENERGIES SE", "isin": "FR0000120271", "quantite": 23, "cours": 42.13, "montant_brut": 968.99, "couts": 8.719999999999999, "montant_net": 977.71, "provisoire": 0, "qte_avant": 26, "qte_apres": 49, "pru_apres": 50.0047, "pv_operation": 0.0}, {"date_execution": "2026-01-22 13:03:57", "reference": "G260122U1009", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "ALLIANZ SE-VNA", "isin": "DE0008404005", "quantite": 4, "cours": 380.66, "montant_brut": 1522.64, "couts": 7.760000000000001, "montant_net": 1530.4, "provisoire": 0, "qte_avant": 0, "qte_apres": 4, "pru_apres": 382.6, "pv_operation": 0.0}, {"date_execution": "2026-01-08 12:56:44", "reference": "70001096", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "BNP PARIBAS ACTIONS A", "isin": "FR0000131104", "quantite": 19, "cours": 67.1, "montant_brut": 1274.9, "couts": 11.469999999999999, "montant_net": 1286.37, "provisoire": 0, "qte_avant": 0, "qte_apres": 19, "pru_apres": 67.7037, "pv_operation": 0.0}, {"date_execution": "2025-12-15 11:49:31", "reference": "70000959", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "AIR LIQUIDE", "isin": "FR0000120073", "quantite": 9, "cours": 179.46, "montant_brut": 1615.14, "couts": 14.54, "montant_net": 1629.68, "provisoire": 0, "qte_avant": 0, "qte_apres": 9, "pru_apres": 181.0756, "pv_operation": 0.0}, {"date_execution": "2025-12-02 10:42:18", "reference": "G251202U1006", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "ENEL", "isin": "IT0003128367", "quantite": 159, "cours": 6.907, "montant_brut": 1098.21, "couts": 5.6000000000000005, "montant_net": 1103.81, "provisoire": 0, "qte_avant": 0, "qte_apres": 159, "pru_apres": 6.9422, "pv_operation": 0.0}, {"date_execution": "2025-11-18 15:35:05", "reference": "70000685", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "SCHNEIDER ELECTRIC SE", "isin": "FR0000121972", "quantite": 5, "cours": 225.96, "montant_brut": 1129.8, "couts": 10.17, "montant_net": 1139.97, "provisoire": 0, "qte_avant": 0, "qte_apres": 5, "pru_apres": 227.994, "pv_operation": 0.0}, {"date_execution": "2025-11-04 14:28:52", "reference": "G251104U1004", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "SAP SE", "isin": "DE0007164600", "quantite": 7, "cours": 223.26, "montant_brut": 1562.82, "couts": 7.97, "montant_net": 1570.79, "provisoire": 0, "qte_avant": 0, "qte_apres": 7, "pru_apres": 224.3986, "pv_operation": 0.0}, {"date_execution": "2025-10-16 13:21:39", "reference": "70000411", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "SANOFI", "isin": "FR0000120578", "quantite": 14, "cours": 98.13, "montant_brut": 1373.82, "couts": 12.370000000000001, "montant_net": 1386.19, "provisoire": 0, "qte_avant": 0, "qte_apres": 14, "pru_apres": 99.0136, "pv_operation": 0.0}, {"date_execution": "2025-10-09 12:14:26", "reference": "G251009U1002", "sens": "ACHAT", "type_transaction": "Achat en bourse étrangère", "libelle": "ASML HOLDING", "isin": "NL0010273215", "quantite": 3, "cours": 680.76, "montant_brut": 2042.28, "couts": 10.41, "montant_net": 2052.69, "provisoire": 0, "qte_avant": 0, "qte_apres": 3, "pru_apres": 684.23, "pv_operation": 0.0}, {"date_execution": "2025-10-02 11:07:13", "reference": "70000137", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "LVMH MOET HENNESSY VUITTON", "isin": "FR0000121014", "quantite": 2, "cours": 603.81, "montant_brut": 1207.62, "couts": 10.870000000000001, "montant_net": 1218.49, "provisoire": 0, "qte_avant": 0, "qte_apres": 2, "pru_apres": 609.245, "pv_operation": 0.0}, {"date_execution": "2025-10-02 10:00:00", "reference": "70000000", "sens": "ACHAT", "type_transaction": "Achat au comptant", "libelle": "TOTALENERGIES SE", "isin": "FR0000120271", "quantite": 26, "cours": 56.13, "montant_brut": 1459.38, "couts": 13.14, "montant_net": 1472.52, "provisoire": 0, "qte_avant": 0, "qte_apres": 26, "pru_apres": 56.6354, "pv_operation": 0.0}], "frais": 171.33, "exemple": true};
+
+// ---------- Formats ----------
+const eur = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
+const eur0 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const nb = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 });
+const pct = new Intl.NumberFormat("fr-FR", { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signe = (v, f) => (v > 0 ? "+" : v < 0 ? "−" : "") + f.format(Math.abs(v));
+const jour = d => new Date(d + "T12:00:00");
+const dateCourte = d => jour(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+const dateLongue = d => jour(d).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+const css = nom => getComputedStyle(document.documentElement).getPropertyValue(nom).trim();
+const SVG = "http://www.w3.org/2000/svg";
+
+function el(tag, attrs = {}, parent, texte) {
+  const e = tag.startsWith("svg:") ? document.createElementNS(SVG, tag.slice(4)) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (texte !== undefined) e.textContent = texte;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+// ---------- Infobulle (textContent uniquement) ----------
+const bulle = document.getElementById("infobulle");
+function montrerBulle(titre, rangs, x, y) {
+  bulle.replaceChildren();
+  el("div", { class: "titre" }, bulle, titre);
+  for (const r of rangs) {
+    const rang = el("div", { class: "rang" }, bulle);
+    if (r.couleur) el("i", { class: "cle-ligne", style: `background:${r.couleur}` }, rang);
+    el("strong", r.classe ? { class: r.classe } : {}, rang, r.valeur);
+    el("span", { class: "nom" }, rang, r.nom);
+  }
+  bulle.style.display = "block";
+  const l = bulle.offsetWidth, h = bulle.offsetHeight;
+  bulle.style.left = Math.max(8, Math.min(x + 14, innerWidth - l - 8)) + "px";
+  bulle.style.top = Math.max(8, Math.min(y - h - 12, innerHeight - h - 8)) + "px";
+}
+const cacherBulle = () => { bulle.style.display = "none"; };
+
+// ---------- Échelle « propre » ----------
+function graduations(min, max, n = 5) {
+  if (min === max) { min -= 1; max += 1; }
+  const brut = (max - min) / n, p = 10 ** Math.floor(Math.log10(brut));
+  const pas = [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= brut);
+  const debut = Math.floor(min / pas) * pas, fin = Math.ceil(max / pas) * pas;
+  const t = [];
+  for (let v = debut; v <= fin + pas / 2; v += pas) t.push(Math.round(v * 1e6) / 1e6);
+  return t;
+}
+
+// ---------- Graphique en ligne avec réticule ----------
+function grapheLigne(conteneur, { lignes, series, signe: avecSigne = false, hauteur = 260 }) {
+  conteneur.replaceChildren();
+  if (!lignes.length) { el("div", { class: "vide" }, conteneur, "Pas encore de cours enregistrés."); return; }
+  const L = conteneur.clientWidth, H = hauteur;
+  const m = { g: 76, d: 16, h: 10, b: 28 };
+  const valeurs = series.flatMap(s => lignes.map(s.valeur));
+  if (avecSigne || series.some(s => s.aire)) valeurs.push(0);  // une aire part toujours de zéro
+  const ticks = graduations(Math.min(...valeurs), Math.max(...valeurs));
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const X = i => m.g + (lignes.length === 1 ? (L - m.g - m.d) / 2 : i * (L - m.g - m.d) / (lignes.length - 1));
+  const Y = v => m.h + (y1 - v) * (H - m.h - m.b) / (y1 - y0);
+  const svg = el("svg:svg", { height: H, viewBox: `0 0 ${L} ${H}`, role: "img" }, conteneur);
+
+  const axe = el("svg:g", { class: "axe" }, svg);
+  for (const t of ticks) {
+    el("svg:line", { x1: m.g, x2: L - m.d, y1: Y(t), y2: Y(t), stroke: avecSigne && t === 0 ? css("--axis") : css("--grid"), "stroke-width": 1 }, axe);
+    el("svg:text", { x: m.g - 8, y: Y(t) + 4, "text-anchor": "end" }, axe, eur0.format(t));
+  }
+  const nbEtiquettes = Math.max(1, Math.floor((L - m.g) / 80));
+  const pasX = Math.max(1, Math.ceil(lignes.length / nbEtiquettes));
+  for (let i = 0; i < lignes.length; i += pasX)
+    el("svg:text", { x: X(i), y: H - 8, "text-anchor": i === 0 ? "start" : "middle" }, axe, dateCourte(lignes[i].date));
+
+  const uid = conteneur.id;
+  if (avecSigne) {
+    const defs = el("svg:defs", {}, svg);
+    el("svg:rect", { x: 0, y: 0, width: L, height: Y(0) }, el("svg:clipPath", { id: uid + "-haut" }, defs));
+    el("svg:rect", { x: 0, y: Y(0), width: L, height: H }, el("svg:clipPath", { id: uid + "-bas" }, defs));
+  }
+  for (const s of [...series].reverse()) {  // la série principale est dessinée en dernier, au-dessus
+    const pts = lignes.map((r, i) => [X(i), Y(s.valeur(r))]);
+    const d = "M" + pts.map(p => p.join(",")).join("L");
+    const aire = `${d}L${pts[pts.length - 1][0]},${Y(avecSigne ? 0 : y0)}L${pts[0][0]},${Y(avecSigne ? 0 : y0)}Z`;
+    const traces = avecSigne ? [["--gain", "-haut"], ["--perte", "-bas"]] : [[s.couleur, null]];
+    for (const [couleur, clip] of traces) {
+      const g = el("svg:g", clip ? { "clip-path": `url(#${uid}${clip})` } : {}, svg);
+      if (s.aire) el("svg:path", { d: aire, fill: css(couleur), "fill-opacity": 0.1 }, g);
+      el("svg:path", { d, fill: "none", stroke: css(couleur), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, g);
+    }
+  }
+
+  // Réticule : suit le pointeur, se cale sur la séance la plus proche ; flèches au clavier
+  const reticule = el("svg:line", { y1: m.h, y2: H - m.b, stroke: css("--axis"), "stroke-width": 1, visibility: "hidden" }, svg);
+  const points = series.map(() => el("svg:circle", { r: 4, "stroke-width": 2, stroke: css("--surface"), visibility: "hidden" }, svg));
+  const zone = el("svg:rect", { class: "zone", x: m.g, y: m.h, width: L - m.g - m.d, height: H - m.h - m.b, fill: "transparent", tabindex: 0,
+    "aria-label": "Graphique : flèches gauche et droite pour parcourir les séances" }, svg);
+  let courant = lignes.length - 1;
+  const afficher = (i, cx, cy) => {
+    courant = i; const r = lignes[i];
+    reticule.setAttribute("x1", X(i)); reticule.setAttribute("x2", X(i)); reticule.setAttribute("visibility", "visible");
+    series.forEach((s, k) => {
+      const v = s.valeur(r), c = avecSigne ? css(v >= 0 ? "--gain" : "--perte") : css(s.couleur);
+      Object.entries({ cx: X(i), cy: Y(v), fill: c, visibility: "visible" }).forEach(([a, b]) => points[k].setAttribute(a, b));
+    });
+    const box = svg.getBoundingClientRect();
+    montrerBulle(dateLongue(r.date), series.map(s => {
+      const v = s.valeur(r);
+      return { valeur: avecSigne ? signe(v, eur) : eur.format(v), nom: s.nom,
+               couleur: avecSigne ? css(v >= 0 ? "--gain" : "--perte") : css(s.couleur) };
+    }), cx ?? box.left + X(i), cy ?? box.top + m.h + 20);
+  };
+  const masquer = () => { reticule.setAttribute("visibility", "hidden"); points.forEach(p => p.setAttribute("visibility", "hidden")); cacherBulle(); };
+  zone.addEventListener("pointermove", e => {
+    const x = e.clientX - svg.getBoundingClientRect().left;
+    const i = lignes.length === 1 ? 0 : Math.round((x - m.g) / ((L - m.g - m.d) / (lignes.length - 1)));
+    afficher(Math.max(0, Math.min(lignes.length - 1, i)), e.clientX, e.clientY);
+  });
+  zone.addEventListener("pointerleave", masquer);
+  zone.addEventListener("focus", () => afficher(courant));
+  zone.addEventListener("blur", masquer);
+  zone.addEventListener("keydown", e => {
+    const pas = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (pas) { e.preventDefault(); afficher(Math.max(0, Math.min(lignes.length - 1, courant + pas))); }
+  });
+
+  // Étiquette directe sur la dernière valeur (série principale)
+  const s0 = series[0], dern = lignes[lignes.length - 1], v0 = s0.valeur(dern);
+  const fin = el("svg:circle", { cx: X(lignes.length - 1), cy: Y(v0), r: 4, "stroke-width": 2, stroke: css("--surface"),
+    fill: avecSigne ? css(v0 >= 0 ? "--gain" : "--perte") : css(s0.couleur) }, svg);
+  svg.insertBefore(fin, reticule);
+}
+
+// ---------- Barres horizontales ----------
+// items : [{ nom, valeur, texte, details: [[libellé, valeur]] }]
+function barres(conteneur, items, { divergent = false } = {}) {
+  conteneur.replaceChildren();
+  if (!items.length) { el("div", { class: "vide" }, conteneur, "Aucune position."); return; }
+  const max = Math.max(...items.map(i => Math.abs(i.valeur)), 1e-9);
+  const minV = Math.min(0, ...items.map(i => i.valeur)), maxV = Math.max(0, ...items.map(i => i.valeur));
+  // Marge de 64 px de chaque côté pour l'étiquette de valeur en bout de barre
+  const pos = v => divergent ? `calc(64px + (100% - 128px) * ${(v - minV) / ((maxV - minV) || 1)})`
+                             : `calc((100% - 64px) * ${v / max})`;
+  for (const it of items) {
+    const ligne = el("div", { class: "ligne" }, conteneur);
+    el("div", { class: "nom", title: it.nom }, ligne, it.nom);
+    const piste = el("div", { class: "piste", tabindex: 0, "aria-label": `${it.nom} : ${it.texte}` }, ligne);
+    const couleur = divergent ? (it.valeur >= 0 ? "var(--gain)" : "var(--perte)") : "var(--serie)";
+    const b = el("div", { class: "barre" }, piste);
+    b.style.background = couleur;
+    const etiquette = el("span", { class: "valeur" }, piste, it.texte);
+    if (divergent) {
+      el("div", { class: "zero" }, piste).style.left = pos(0);
+      const [a, z] = it.valeur >= 0 ? [0, it.valeur] : [it.valeur, 0];
+      b.style.left = pos(a); b.style.width = `calc(${pos(z)} - ${pos(a)})`;
+      b.style.borderRadius = it.valeur >= 0 ? "0 4px 4px 0" : "4px 0 0 4px";
+      if (it.valeur >= 0) etiquette.style.left = `calc(${pos(z)} + 6px)`;
+      else etiquette.style.right = `calc(100% - ${pos(a)} + 6px)`;
+    } else {
+      b.style.left = "0"; b.style.width = pos(it.valeur); b.style.borderRadius = "0 4px 4px 0";
+      etiquette.style.left = `calc(${pos(it.valeur)} + 6px)`;
+    }
+    const montrer = (x, y) => montrerBulle(it.nom, it.details.map(([v, n, classe]) => ({ nom: n, valeur: v, classe })), x, y);
+    piste.addEventListener("pointermove", e => montrer(e.clientX, e.clientY));
+    piste.addEventListener("pointerleave", cacherBulle);
+    piste.addEventListener("focus", () => { const r = piste.getBoundingClientRect(); montrer(r.left + r.width / 2, r.top); });
+    piste.addEventListener("blur", cacherBulle);
+  }
+}
+
+// ---------- Tableau triable ----------
+function tableau(table, colonnes, lignes, triInitial) {
+  let tri = triInitial;
+  const dessiner = () => {
+    const c = colonnes.find(c => c.cle === tri.cle);
+    const tries = [...lignes].sort((a, b) => {
+      const va = c.tri ? c.tri(a) : a[c.cle], vb = c.tri ? c.tri(b) : b[c.cle];
+      return (va < vb ? -1 : va > vb ? 1 : 0) * tri.sens;
+    });
+    table.replaceChildren();
+    const tr = el("tr", {}, el("thead", {}, table));
+    for (const col of colonnes) {
+      const th = el("th", { class: col.n ? "n" : "", "data-tri": col.cle, scope: "col" }, tr, col.titre);
+      if (col.cle === tri.cle) th.setAttribute("aria-sort", tri.sens > 0 ? "ascending" : "descending");
+      th.addEventListener("click", () => { tri = { cle: col.cle, sens: tri.cle === col.cle ? -tri.sens : (col.n ? -1 : 1) }; dessiner(); });
+    }
+    const tbody = el("tbody", {}, table);
+    for (const l of tries) {
+      const r = el("tr", {}, tbody);
+      for (const col of colonnes) {
+        const td = el("td", { class: col.n ? "n" : "" }, r);
+        col.rendu ? col.rendu(td, l) : (td.textContent = col.format ? col.format(l[col.cle], l) : l[col.cle] ?? "");
+      }
+    }
+  };
+  dessiner();
+}
+const cellulePV = fmt => (td, v) => { td.textContent = v == null ? "" : signe(v, fmt); if (v) td.className = "n " + (v > 0 ? "gain-txt" : "perte-txt"); };
+
+// ---------- Partage d'une transaction ----------
+const coursFmt = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const actions = n => `${nb.format(n)} action${n > 1 ? "s" : ""}`;
+function textePartage(t) {
+  const debut = `${t.sens === "ACHAT" ? "Achat" : "Vente"} de ${actions(t.quantite)} ${t.libelle} (${t.isin}) au cours de ${coursFmt.format(t.cours)} (frais : ${eur.format(t.couts)}${t.provisoire ? ", hors commission" : ""})`;
+  if (t.sens === "ACHAT")
+    return t.qte_avant > 0
+      ? `${debut}, mon PRU devient ${eur.format(t.pru_apres)} pour ${actions(t.qte_apres)} au total.`
+      : `${debut}.`;
+  const pv = `plus-value réalisée de ${signe(t.pv_operation, eur)}`;
+  return t.qte_apres > 0
+    ? `${debut}, ${pv}, il m'en reste ${nb.format(t.qte_apres)} (PRU ${eur.format(t.pru_apres)}).`
+    : `${debut}, ${pv}, ligne soldée.`;
+}
+async function partager(bouton, t) {
+  const texte = textePartage(t);
+  const confirmer = libelle => {
+    bouton.textContent = libelle; bouton.classList.add("fait");
+    setTimeout(() => { bouton.textContent = "Partager"; bouton.classList.remove("fait"); }, 2000);
+  };
+  if (navigator.share) {
+    try { await navigator.share({ text: texte }); return; }
+    catch (e) { if (e.name === "AbortError") return; }
+  }
+  try { await navigator.clipboard.writeText(texte); confirmer("Copié ✓"); return; } catch {}
+  // Dernier recours : le texte sélectionné, prêt à copier
+  let zone = bouton.parentElement.querySelector(".texte-partage");
+  if (!zone) zone = el("textarea", { class: "texte-partage", rows: 3, readonly: "" }, bouton.parentElement);
+  zone.value = texte; zone.select();
+}
+
+// ---------- Assemblage ----------
+const H = D.historique, P = D.positions;
+const dernier = H[H.length - 1], veille = H[H.length - 2];
+const totalValo = P.reduce((s, p) => s + (p.valorisation ?? p.montant_investi), 0);
+
+document.getElementById("sous-titre").textContent = (D.exemple ? "Exemple avec des données fictives · " : "")
+  + (dernier ? `Cours de clôture du ${dateLongue(dernier.date)} · mis à jour le ${D.genere_le}`
+             : `Mis à jour le ${D.genere_le}`);
+
+(function kpis() {
+  const k = document.getElementById("kpis");
+  const tuile = (label, valeur, delta, hero) => {
+    const t = el("div", { class: "tuile" + (hero ? " hero" : "") }, k);
+    el("div", { class: "label" }, t, label);
+    el("div", { class: "valeur" }, t, valeur);
+    if (delta) el("div", { class: "delta " + (delta.v > 0 ? "gain" : delta.v < 0 ? "perte" : "") }, t,
+                  (delta.v > 0 ? "▲ " : delta.v < 0 ? "▼ " : "") + delta.texte);
+  };
+  if (!dernier) { tuile("Valorisation", "—", null, true); return; }
+  const pvPct = dernier.plus_value_latente / dernier.montant_investi;
+  tuile("Valorisation", eur0.format(dernier.valorisation),
+        { v: dernier.plus_value_latente, texte: `${signe(dernier.plus_value_latente, eur)} (${signe(pvPct, pct)}) de plus-value latente` }, true);
+  if (veille) {
+    const v = dernier.plus_value_latente - veille.plus_value_latente;
+    const base = veille.valorisation + (dernier.montant_investi - veille.montant_investi);
+    tuile("Dernière séance", signe(v, eur), { v, texte: signe(v / base, pct) });
+  }
+  tuile("Montant investi", eur0.format(dernier.montant_investi), { v: 0, texte: `${P.length} lignes` });
+  tuile("Plus-value réalisée", signe(dernier.plus_value_realisee, eur), { v: 0, texte: "ventes cumulées" });
+  tuile("Frais payés", eur.format(D.frais), { v: 0, texte: `${D.transactions.length} opérations` });
+})();
+
+// Période (mémorisée localement si possible) : "1s" = 1 semaine, "3m" = 3 mois, "tout"
+let periode = "tout";
+try {
+  const memo = localStorage.getItem("pea-periode");
+  // Anciennes versions : nombre de mois, 0 pour tout
+  if (/^\d+$/.test(memo ?? "")) periode = memo === "0" ? "tout" : `${memo}m`;
+  else if (document.querySelector(`#periodes [data-periode="${memo}"]`)) periode = memo;
+} catch {}
+function filtrer() {
+  const m = /^(\d+)([sm])$/.exec(periode);
+  if (!m || !dernier) return H;
+  const limite = jour(dernier.date), n = Number(m[1]);
+  if (m[2] === "s") limite.setDate(limite.getDate() - 7 * n);
+  else limite.setMonth(limite.getMonth() - n);
+  const iso = limite.toISOString().slice(0, 10);
+  return H.filter(r => r.date >= iso);
+}
+function dessinerEvolution() {
+  const lignes = filtrer();
+  grapheLigne(document.getElementById("g-valorisation"), { lignes, series: [
+    { nom: "Valorisation", valeur: r => r.valorisation, couleur: "--serie", aire: true },
+    { nom: "Montant investi", valeur: r => r.montant_investi, couleur: "--contexte" },
+  ] });
+  grapheLigne(document.getElementById("g-plus-value"), { lignes, signe: true, hauteur: 220, series: [
+    { nom: "Plus-value latente", valeur: r => r.plus_value_latente, aire: true },
+  ] });
+}
+const boutons = document.querySelectorAll("#periodes button");
+function choisirPeriode(p) {
+  periode = p;
+  boutons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.periode === p)));
+  try { localStorage.setItem("pea-periode", p); } catch {}
+  dessinerEvolution();
+}
+boutons.forEach(b => b.addEventListener("click", () => choisirPeriode(b.dataset.periode)));
+
+function dessinerBarres() {
+  const detailsPosition = p => [
+    [eur.format(p.valorisation ?? 0), "valorisation"],
+    [signe(p.plus_value_latente ?? 0, eur), "plus-value latente", (p.plus_value_latente ?? 0) >= 0 ? "gain-txt" : "perte-txt"],
+    [`${nb.format(p.quantite)} × ${eur.format(p.cours ?? 0)}`, "quantité × cours"],
+    [eur.format(p.pru), "PRU"],
+  ];
+  barres(document.getElementById("b-performance"),
+    [...P].filter(p => p.plus_value_pct != null).sort((a, b) => b.plus_value_pct - a.plus_value_pct)
+      .map(p => ({ nom: p.libelle, valeur: p.plus_value_pct, texte: signe(p.plus_value_pct / 100, pct), details: detailsPosition(p) })),
+    { divergent: true });
+  barres(document.getElementById("b-poids"),
+    P.map(p => ({ nom: p.libelle, valeur: (p.valorisation ?? 0) / totalValo,
+                  texte: pct.format((p.valorisation ?? 0) / totalValo), details: detailsPosition(p) })));
+  const regrouper = cle => {
+    const g = new Map();
+    for (const p of P) {
+      const k = p[cle] || "Non renseigné", e = g.get(k) || { valo: 0, pv: 0, lignes: [] };
+      e.valo += p.valorisation ?? 0; e.pv += p.plus_value_latente ?? 0; e.lignes.push(p.libelle); g.set(k, e);
+    }
+    return [...g].sort((a, b) => b[1].valo - a[1].valo).map(([k, e]) => ({
+      nom: k, valeur: e.valo / totalValo, texte: pct.format(e.valo / totalValo),
+      details: [[eur.format(e.valo), "valorisation"],
+                [signe(e.pv, eur), "plus-value latente", e.pv >= 0 ? "gain-txt" : "perte-txt"],
+                [String(e.lignes.length), e.lignes.length > 1 ? "lignes" : "ligne"]],
+    }));
+  };
+  barres(document.getElementById("b-secteurs"), regrouper("secteur"));
+  barres(document.getElementById("b-pays"), regrouper("pays"));
+}
+
+tableau(document.getElementById("t-positions"), [
+  { cle: "libelle", titre: "Valeur", rendu: (td, p) => {
+      td.textContent = p.libelle;
+      if (p.provisoires) el("span", { class: "badge", title: "Saisi depuis le suivi des ordres : commission non connue, avis d'opéré attendu" }, td, "provisoire");
+      el("span", { class: "isin" }, td, `${p.isin} · ${p.symbole ?? ""}`); } },
+  { cle: "secteur", titre: "Secteur" },
+  { cle: "quantite", titre: "Qté", n: true, format: v => nb.format(v) },
+  { cle: "pru", titre: "PRU", n: true, format: v => eur.format(v) },
+  { cle: "cours", titre: "Cours", n: true, format: v => v == null ? "" : eur.format(v) },
+  { cle: "montant_investi", titre: "Investi", n: true, format: v => eur.format(v) },
+  { cle: "valorisation", titre: "Valorisation", n: true, format: v => v == null ? "" : eur.format(v) },
+  { cle: "plus_value_latente", titre: "+/− value", n: true, rendu: (td, p) => cellulePV(eur)(td, p.plus_value_latente) },
+  { cle: "plus_value_pct", titre: "%", n: true, rendu: (td, p) => cellulePV(pct)(td, p.plus_value_pct == null ? null : p.plus_value_pct / 100) },
+  { cle: "poids", titre: "Poids", n: true, tri: p => p.valorisation ?? 0, rendu: (td, p) => { td.textContent = pct.format((p.valorisation ?? 0) / totalValo); } },
+], P, { cle: "valorisation", sens: -1 });
+
+tableau(document.getElementById("t-historique"), [
+  { cle: "date", titre: "Date", format: v => dateLongue(v) },
+  { cle: "montant_investi", titre: "Investi", n: true, format: v => eur.format(v) },
+  { cle: "valorisation", titre: "Valorisation", n: true, format: v => eur.format(v) },
+  { cle: "plus_value_latente", titre: "+/− value latente", n: true, rendu: (td, r) => cellulePV(eur)(td, r.plus_value_latente) },
+  { cle: "plus_value_realisee", titre: "+/− value réalisée", n: true, rendu: (td, r) => cellulePV(eur)(td, r.plus_value_realisee) },
+], H, { cle: "date", sens: -1 });
+
+document.getElementById("resume-transactions").textContent = `Voir les ${D.transactions.length} opérations`;
+tableau(document.getElementById("t-transactions"), [
+  { cle: "partage", titre: "", tri: t => t.date_execution, rendu: (td, t) => {
+      const b = el("button", { class: "partager", type: "button", title: textePartage(t),
+                               "aria-label": `Partager : ${textePartage(t)}` }, td, "Partager");
+      b.addEventListener("click", () => partager(b, t)); } },
+  { cle: "date_execution", titre: "Date", format: v => `${jour(v.slice(0, 10)).toLocaleDateString("fr-FR")} ${v.slice(11, 16)}` },
+  { cle: "type_transaction", titre: "Opération" },
+  { cle: "libelle", titre: "Valeur", rendu: (td, t) => {
+      td.textContent = t.libelle;
+      if (t.provisoire) el("span", { class: "badge", title: "Commission non connue, avis d'opéré attendu" }, td, "provisoire");
+      el("span", { class: "isin" }, td, t.isin); } },
+  { cle: "quantite", titre: "Qté", n: true, format: v => nb.format(v) },
+  { cle: "cours", titre: "Cours", n: true, format: v => coursFmt.format(v) },
+  { cle: "montant_brut", titre: "Brut", n: true, format: v => eur.format(v) },
+  { cle: "couts", titre: "Frais", n: true, format: v => eur.format(v) },
+  { cle: "montant_net", titre: "Net", n: true, format: v => eur.format(v) },
+  { cle: "reference", titre: "Référence" },
+], D.transactions, { cle: "date_execution", sens: -1 });
+
+// Rendu initial, puis au redimensionnement et au changement de thème
+choisirPeriode(periode);
+dessinerBarres();
+let attente;
+new ResizeObserver(() => { clearTimeout(attente); attente = setTimeout(dessinerEvolution, 80); })
+  .observe(document.querySelector("main"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", dessinerEvolution);
+</script>
+</body>
+</html>

@@ -2,6 +2,10 @@
 
 Suivi automatisé d'un PEA (Plan d'Épargne en Actions) à partir des avis d'opéré PDF de la banque.
 
+![Tableau de bord généré avec des données fictives](apercu.png)
+
+*Aperçu avec des données fictives. Version interactive : [tableau_exemple.html](https://djenvert.github.io/gestion-pea/tableau_exemple.html).*
+
 On dépose un avis dans `inbox/` : il est lu, vérifié puis enregistré dans une base SQLite. Les cours de clôture sont récupérés sur Yahoo Finance et un tableau de bord HTML autonome est régénéré. Tout tourne en local, sans dépendance à installer.
 
 ## Fonctionnalités
@@ -36,6 +40,8 @@ python3 pea.py tableau      # régénère seulement tableau.html
 
 open tableau.html
 ```
+
+Pour voir le rendu sans aucune donnée personnelle, `python3 exemple.py` génère `tableau_exemple.html`. Il porte sur un portefeuille fictif de 11 valeurs européennes : les sociétés sont réelles, mais les opérations et les cours sont inventés.
 
 La base `pea.db` est créée au premier lancement. Le journal est écrit dans `logs/pea.log`.
 
@@ -100,6 +106,7 @@ Un verrou (`.pea.lock`) empêche deux traitements de tourner en même temps.
 | `cours_yahoo.py` | Recherche du symbole par ISIN et clôtures quotidiennes sur Yahoo Finance |
 | `tableau.py` | Génère `tableau.html` en injectant les données dans le modèle |
 | `tableau_modele.html` | Modèle du tableau de bord (HTML, SVG et JavaScript natifs) |
+| `exemple.py` | Génère `tableau_exemple.html` avec des données fictives |
 | `tests/` | Tests unitaires |
 
 La table `transactions` est la seule source de vérité. Les tables `valeurs` (positions, PRU) et `historique` (valorisation quotidienne) en sont dérivées et reconstruites à chaque passage.

@@ -456,9 +456,9 @@ const H = D.historique, P = D.positions;
 const dernier = H[H.length - 1], veille = H[H.length - 2];
 const totalValo = P.reduce((s, p) => s + (p.valorisation ?? p.montant_investi), 0);
 
-document.getElementById("sous-titre").textContent = dernier
-  ? `Cours de clôture du ${dateLongue(dernier.date)} · mis à jour le ${D.genere_le}`
-  : `Mis à jour le ${D.genere_le}`;
+document.getElementById("sous-titre").textContent = (D.exemple ? "Exemple avec des données fictives · " : "")
+  + (dernier ? `Cours de clôture du ${dateLongue(dernier.date)} · mis à jour le ${D.genere_le}`
+             : `Mis à jour le ${D.genere_le}`);
 
 (function kpis() {
   const k = document.getElementById("kpis");

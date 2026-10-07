@@ -13,6 +13,7 @@ python3 pea.py traiter      # traite inbox/ (PDF et .txt), archive dans outbox/A
 python3 pea.py recalculer   # reconstruit valeurs + historique depuis transactions, puis le tableau
 python3 pea.py cours        # récupère les clôtures manquantes (réseau), puis historique + tableau
 python3 pea.py tableau      # régénère seulement tableau.html
+python3 exemple.py          # tableau_exemple.html : données fictives (graine fixe), publiable
 
 python3 -m unittest tests/test_parser.py tests/test_anonymat.py                 # tous les tests
 python3 -m unittest tests.test_parser.TestParser.test_achat_bourse_etrangere    # un test

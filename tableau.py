@@ -56,14 +56,18 @@ def donnees(con: sqlite3.Connection) -> dict:
     }
 
 
+def ecrire(d: dict, sortie: Path) -> Path:
+    # `</` échappé pour que les données ne puissent pas fermer la balise <script>
+    charge = json.dumps(d, ensure_ascii=False).replace("</", "<\\/")
+    sortie.write_text(MODELE.read_text(encoding="utf-8").replace("/*__DONNEES__*/null", charge),
+                      encoding="utf-8")
+    return sortie
+
+
 def generer(base: Path) -> Path:
     con = sqlite3.connect(base)
     con.row_factory = sqlite3.Row
-    # `</` échappé pour que les données ne puissent pas fermer la balise <script>
-    charge = json.dumps(donnees(con), ensure_ascii=False).replace("</", "<\\/")
-    SORTIE.write_text(MODELE.read_text(encoding="utf-8").replace("/*__DONNEES__*/null", charge),
-                      encoding="utf-8")
-    return SORTIE
+    return ecrire(donnees(con), SORTIE)
 
 
 if __name__ == "__main__":
