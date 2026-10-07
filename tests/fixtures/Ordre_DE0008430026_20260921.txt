@@ -1,0 +1,12 @@
+MUENCH.RUECKVERS. NA O.N.     DE0008430026     ACT. NOMINATIVE
+
+  Ordre N° G260921U5177 passé le 21/09/2026 par INCONNU    Etat : Exécuté
+ Type de l'ordre    
+ Date d'exécution    21/09/2026
+ Quantité demandée    4
+ Quantité exécutée    4
+ Cours d'exécution    509,4  EUR
+ Règlement    Comptant
+ Montant brut    2 037,60 EUR
+ Frais    Les frais estimés repris dans cet écran (ou inclus dans le montant estimé de l’opération) sont ceux liés au passage de l’ordre et correspondent au montant susceptible d’être débité de votre compte. Ils ne comprennent pas les éventuels frais récurrents et accessoires restitués dans le document PDF que vous avez pu imprimer ou enregistrer avant de valider votre ordre.    0,20 EUR
+ Montant net    2 037,80 EUR

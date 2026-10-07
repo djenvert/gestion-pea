@@ -1,0 +1,25 @@
+# Données personnelles et fichiers de travail
+inbox/*
+!inbox/.gitkeep
+outbox/
+erreurs/
+logs/
+pea.db
+pea.db-journal
+.pea.lock
+
+# Généré à chaque import ou mise à jour des cours (contient le portefeuille)
+tableau.html
+
+# Vrais avis d'opéré : nom, adresse et numéros de compte
+tests/fixtures/*.pdf
+# Liste locale des données à ne jamais publier (lue par test_anonymat.py)
+tests/interdits.txt
+
+# Documents de travail
+docs/
+
+# Python et macOS
+__pycache__/
+*.pyc
+.DS_Store

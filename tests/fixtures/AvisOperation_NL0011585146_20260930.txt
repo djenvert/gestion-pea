@@ -1,0 +1,76 @@
+                                                                                                                    OPERATION DE BOURSE
+
+
+
+
+
+
+
+
+
+
+
+
+
+Nous avons le plaisir de vous transmettre l'avis
+d'opéré concernant l'opération de bourse que
+vous nous avez confiée.
+
+                                                                                           MR JEAN DUPONT
+                                                                                           1 RUE DE LA PAIX
+                                                                                           75000 PARIS
+
+
+
+
+               Nom de l'agence                               Références de votre compte titres                                 Compte espèces associé
+
+             AGENCE EXEMPLE                                       12345 00000 00000000001                                12345 00000 00000000002 EUR
+
+
+ACHAT EN BOURSE ETRANGERE
+ACTION
+                                                                                                                                                                                                              F1
+
+  Date et heure
+locale d'exécution        Quantité                            Informations sur la valeur                                       Informations sur l'exécution
+
+                                                                                                                                                                                                              P000 1/1
+    30/09/2026                3            FERRARI                                                               Référence :                                                                   G260930U3914
+     12:09:08
+
+                                           Code ISIN :     NL0011585146                                          Cours exécuté :                                                        347,65 EUR
+                                                                                                                 Lieu d'exécution :                                                EURONEXT MILAN
+
+
+
+
+                                                                    Montant transaction
+ Montant transaction brut                 Intérêts                      total brut                     Courtages (1)                  Montant transaction net au débit
+        1 042,95 EUR                      0,00 EUR                      1 042,95 EUR                      0,10 EUR                                   1 043,05 EUR
+                                          000 jours
+
+
+
+
+                                                                        Commission                      Frais divers                   Montant total des frais débités
+                                                                          5,11 EUR                        0,00 EUR                                          5,11 EUR
+
+                                                                                                                                Montant net au débit de votre compte
+
+                                                                                                                                                     1 048,16 EUR
+
+
+
+
+Sous réserve de bonne fin. (1) Frais inhérents à la Taxe sur les Transactions Financières.
+
+
+Toute réclamation doit être formulée dans les dix jours qui suivent la mise à disposition du présent avis.
+La direction de votre agence est à votre disposition pour tout renseignement que vous souhaiteriez demander sur le présent document.
+
+
+
+
+               SOCIÉTÉ GÉNÉRALE S.A. AU CAPITAL DE 938 625 838,75 EUR. SIÈGE SOCIAL À PARIS, 29 BD HAUSSMANN. 552 120 222 R.C.S. PARIS. N° TVA FR27552120222
+

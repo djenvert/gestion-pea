@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon PEA</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --wash: rgba(11,11,11,0.04);
+  --serie: #2a78d6;          /* valorisation, poids */
+  --gain: #2a78d6;           /* pôle bleu du divergent */
+  --perte: #e34948;          /* pôle rouge du divergent */
+  --contexte: #898781;       /* montant investi (série de contexte) */
+  --texte-gain: #006300;
+  --texte-perte: #b42323;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+    --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781;
+    --texte-gain: #0ca30c; --texte-perte: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+  --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781;
+  --texte-gain: #0ca30c; --texte-perte: #e66767;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0; font-weight: 600; }
+h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
+.sous-titre { color: var(--ink-2); margin: 2px 0 0; }
+.note { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* KPI */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }
+.kpis .hero { grid-column: span 2; }
+@media (max-width: 520px) { .kpis .hero { grid-column: 1 / -1; } .tuile.hero .valeur { font-size: 40px; } }
+.tuile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tuile .label { color: var(--ink-2); font-size: 13px; }
+.tuile .valeur { font-size: 22px; font-weight: 600; margin-top: 4px; }
+.tuile.hero .valeur { font-size: 48px; line-height: 1.1; letter-spacing: -0.02em; }
+.delta { font-size: 13px; font-weight: 500; margin-top: 4px; }
+.delta.gain { color: var(--texte-gain); } .delta.perte { color: var(--texte-perte); }
+
+/* Filtres */
+.filtres { display: flex; align-items: center; gap: 10px; margin: 8px 0 12px; flex-wrap: wrap; }
+.filtres .label { color: var(--ink-2); font-size: 13px; }
+.segments { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+            background: var(--surface); }
+.segments button { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: 0;
+                   padding: 5px 12px; cursor: pointer; }
+.segments button + button { border-left: 1px solid var(--border); }
+.segments button:hover { background: var(--wash); }
+.segments button[aria-pressed="true"] { color: var(--ink); font-weight: 600; background: var(--wash); }
+
+/* Cartes */
+.carte { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+         padding: 16px; margin-bottom: 12px; min-width: 0; }
+.grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 12px; }
+.grille .carte { margin-bottom: 0; }
+.grille + .carte, .grille + .grille { margin-top: 12px; }
+.legende { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); margin: 6px 0 4px; }
+.legende span { display: inline-flex; align-items: center; gap: 6px; }
+.cle-ligne { width: 16px; height: 2px; border-radius: 1px; display: inline-block; }
+.cle-rect { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* Graphique en ligne */
+.graphe { position: relative; }
+.graphe svg { display: block; width: 100%; overflow: visible; }
+.graphe .zone { cursor: crosshair; outline: none; }
+.graphe .zone:focus-visible { outline: 2px solid var(--serie); outline-offset: 2px; }
+.axe text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Barres horizontales (HTML) */
+.barres { display: grid; grid-template-columns: minmax(90px, 34%) 1fr; row-gap: 4px; align-items: center; }
+.barres .nom { color: var(--ink-2); font-size: 13px; white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; padding-right: 10px; }
+.barres .piste { position: relative; height: 22px; }
+.barres .ligne { display: contents; }
+.barres .ligne > * { outline: none; }
+.barres .ligne:hover > *, .barres .ligne:focus-within > * { background: var(--wash); }
+.barres .barre { position: absolute; top: 4px; height: 14px; }
+.barres .valeur { position: absolute; top: 2px; font-size: 12px; color: var(--ink-2); white-space: nowrap;
+                  font-variant-numeric: tabular-nums; }
+.barres .zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--axis); }
+
+/* Infobulle */
+.infobulle { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--ink);
+             border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+             box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 160px; display: none; }
+.infobulle .titre { color: var(--ink-2); margin-bottom: 4px; }
+.infobulle .rang { display: flex; align-items: center; gap: 8px; }
+.infobulle .rang strong { font-variant-numeric: tabular-nums; }
+.infobulle .rang .nom { color: var(--ink-2); }
+
+/* Tableaux */
+details { margin-top: 10px; }
+summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+.defile { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 7px 8px; border-bottom: 1px solid var(--grid); text-align: left; white-space: nowrap; }
+th { color: var(--ink-2); font-weight: 500; position: sticky; top: 0; background: var(--surface); }
+th[data-tri] { cursor: pointer; user-select: none; }
+th[data-tri]:hover { color: var(--ink); }
+th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; }
+th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+td .isin { color: var(--muted); font-size: 11px; display: block; }
+.badge { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--border);
+         border-radius: 999px; font-size: 11px; color: var(--ink-2); vertical-align: 1px; }
+.partager { font: inherit; font-size: 12px; color: var(--ink-2); background: none; cursor: pointer;
+            border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; }
+.partager:hover { color: var(--ink); background: var(--wash); }
+.partager.fait { color: var(--texte-gain); }
+.texte-partage { width: 100%; min-width: 320px; font: inherit; font-size: 12px; margin-top: 6px; }
+.gain-txt { color: var(--texte-gain); } .perte-txt { color: var(--texte-perte); }
+.vide { color: var(--muted); padding: 32px 0; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Mon PEA</h1>
+    <p class="sous-titre" id="sous-titre"></p>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Chiffres clés"></section>
+
+  <div class="filtres" role="group" aria-label="Période des graphiques d'évolution">
+    <span class="label">Période</span>
+    <div class="segments" id="periodes">
+      <button data-mois="1">1 mois</button><button data-mois="3">3 mois</button>
+      <button data-mois="6">6 mois</button><button data-mois="12">1 an</button>
+      <button data-mois="0">Tout</button>
+    </div>
+  </div>
+
+  <section class="carte">
+    <h2>Valorisation et montant investi</h2>
+    <p class="note">Valorisation à la clôture, comparée au coût de revient des titres détenus (frais inclus).</p>
+    <div class="legende">
+      <span><i class="cle-ligne" style="background:var(--serie)"></i>Valorisation</span>
+      <span><i class="cle-ligne" style="background:var(--contexte)"></i>Montant investi</span>
+    </div>
+    <div class="graphe" id="g-valorisation"></div>
+  </section>
+
+  <section class="carte">
+    <h2>Plus-value latente</h2>
+    <p class="note">Valorisation moins montant investi : au-dessus de zéro en bleu, en dessous en rouge.</p>
+    <div class="graphe" id="g-plus-value"></div>
+    <details>
+      <summary>Voir les données jour par jour</summary>
+      <div class="defile"><table id="t-historique"></table></div>
+    </details>
+  </section>
+
+  <div class="grille">
+    <section class="carte">
+      <h2>Performance par ligne</h2>
+      <p class="note">Dernier cours rapporté au PRU, frais inclus.</p>
+      <div class="barres" id="b-performance"></div>
+    </section>
+    <section class="carte">
+      <h2>Poids dans le portefeuille</h2>
+      <p class="note">Part de chaque ligne dans la valorisation.</p>
+      <div class="barres" id="b-poids"></div>
+    </section>
+  </div>
+
+  <div class="grille">
+    <section class="carte">
+      <h2>Répartition par secteur</h2>
+      <p class="note">Part de la valorisation, secteurs Yahoo Finance.</p>
+      <div class="barres" id="b-secteurs"></div>
+    </section>
+    <section class="carte">
+      <h2>Répartition par pays</h2>
+      <p class="note">Pays d'immatriculation de la société (préfixe de l'ISIN).</p>
+      <div class="barres" id="b-pays"></div>
+    </section>
+  </div>
+
+  <section class="carte">
+    <h2>Positions</h2>
+    <p class="note">Cliquer sur un en-tête pour trier.</p>
+    <div class="defile"><table id="t-positions"></table></div>
+  </section>
+
+  <section class="carte">
+    <h2>Transactions</h2>
+    <details>
+      <summary id="resume-transactions"></summary>
+      <div class="defile"><table id="t-transactions"></table></div>
+    </details>
+  </section>
+</main>
+<div class="infobulle" id="infobulle" role="status"></div>
+
+<script>
+const D = /*__DONNEES__*/null;
+
+// ---------- Formats ----------
+const eur = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
+const eur0 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const nb = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 });
+const pct = new Intl.NumberFormat("fr-FR", { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signe = (v, f) => (v > 0 ? "+" : v < 0 ? "−" : "") + f.format(Math.abs(v));
+const jour = d => new Date(d + "T12:00:00");
+const dateCourte = d => jour(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+const dateLongue = d => jour(d).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+const css = nom => getComputedStyle(document.documentElement).getPropertyValue(nom).trim();
+const SVG = "http://www.w3.org/2000/svg";
+
+function el(tag, attrs = {}, parent, texte) {
+  const e = tag.startsWith("svg:") ? document.createElementNS(SVG, tag.slice(4)) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (texte !== undefined) e.textContent = texte;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+// ---------- Infobulle (textContent uniquement) ----------
+const bulle = document.getElementById("infobulle");
+function montrerBulle(titre, rangs, x, y) {
+  bulle.replaceChildren();
+  el("div", { class: "titre" }, bulle, titre);
+  for (const r of rangs) {
+    const rang = el("div", { class: "rang" }, bulle);
+    if (r.couleur) el("i", { class: "cle-ligne", style: `background:${r.couleur}` }, rang);
+    el("strong", r.classe ? { class: r.classe } : {}, rang, r.valeur);
+    el("span", { class: "nom" }, rang, r.nom);
+  }
+  bulle.style.display = "block";
+  const l = bulle.offsetWidth, h = bulle.offsetHeight;
+  bulle.style.left = Math.max(8, Math.min(x + 14, innerWidth - l - 8)) + "px";
+  bulle.style.top = Math.max(8, Math.min(y - h - 12, innerHeight - h - 8)) + "px";
+}
+const cacherBulle = () => { bulle.style.display = "none"; };
+
+// ---------- Échelle « propre » ----------
+function graduations(min, max, n = 5) {
+  if (min === max) { min -= 1; max += 1; }
+  const brut = (max - min) / n, p = 10 ** Math.floor(Math.log10(brut));
+  const pas = [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= brut);
+  const debut = Math.floor(min / pas) * pas, fin = Math.ceil(max / pas) * pas;
+  const t = [];
+  for (let v = debut; v <= fin + pas / 2; v += pas) t.push(Math.round(v * 1e6) / 1e6);
+  return t;
+}
+
+// ---------- Graphique en ligne avec réticule ----------
+function grapheLigne(conteneur, { lignes, series, signe: avecSigne = false, hauteur = 260 }) {
+  conteneur.replaceChildren();
+  if (!lignes.length) { el("div", { class: "vide" }, conteneur, "Pas encore de cours enregistrés."); return; }
+  const L = conteneur.clientWidth, H = hauteur;
+  const m = { g: 76, d: 16, h: 10, b: 28 };
+  const valeurs = series.flatMap(s => lignes.map(s.valeur));
+  if (avecSigne || series.some(s => s.aire)) valeurs.push(0);  // une aire part toujours de zéro
+  const ticks = graduations(Math.min(...valeurs), Math.max(...valeurs));
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const X = i => m.g + (lignes.length === 1 ? (L - m.g - m.d) / 2 : i * (L - m.g - m.d) / (lignes.length - 1));
+  const Y = v => m.h + (y1 - v) * (H - m.h - m.b) / (y1 - y0);
+  const svg = el("svg:svg", { height: H, viewBox: `0 0 ${L} ${H}`, role: "img" }, conteneur);
+
+  const axe = el("svg:g", { class: "axe" }, svg);
+  for (const t of ticks) {
+    el("svg:line", { x1: m.g, x2: L - m.d, y1: Y(t), y2: Y(t), stroke: avecSigne && t === 0 ? css("--axis") : css("--grid"), "stroke-width": 1 }, axe);
+    el("svg:text", { x: m.g - 8, y: Y(t) + 4, "text-anchor": "end" }, axe, eur0.format(t));
+  }
+  const nbEtiquettes = Math.max(1, Math.floor((L - m.g) / 80));
+  const pasX = Math.max(1, Math.ceil(lignes.length / nbEtiquettes));
+  for (let i = 0; i < lignes.length; i += pasX)
+    el("svg:text", { x: X(i), y: H - 8, "text-anchor": i === 0 ? "start" : "middle" }, axe, dateCourte(lignes[i].date));
+
+  const uid = conteneur.id;
+  if (avecSigne) {
+    const defs = el("svg:defs", {}, svg);
+    el("svg:rect", { x: 0, y: 0, width: L, height: Y(0) }, el("svg:clipPath", { id: uid + "-haut" }, defs));
+    el("svg:rect", { x: 0, y: Y(0), width: L, height: H }, el("svg:clipPath", { id: uid + "-bas" }, defs));
+  }
+  for (const s of [...series].reverse()) {  // la série principale est dessinée en dernier, au-dessus
+    const pts = lignes.map((r, i) => [X(i), Y(s.valeur(r))]);
+    const d = "M" + pts.map(p => p.join(",")).join("L");
+    const aire = `${d}L${pts[pts.length - 1][0]},${Y(avecSigne ? 0 : y0)}L${pts[0][0]},${Y(avecSigne ? 0 : y0)}Z`;
+    const traces = avecSigne ? [["--gain", "-haut"], ["--perte", "-bas"]] : [[s.couleur, null]];
+    for (const [couleur, clip] of traces) {
+      const g = el("svg:g", clip ? { "clip-path": `url(#${uid}${clip})` } : {}, svg);
+      if (s.aire) el("svg:path", { d: aire, fill: css(couleur), "fill-opacity": 0.1 }, g);
+      el("svg:path", { d, fill: "none", stroke: css(couleur), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, g);
+    }
+  }
+
+  // Réticule : suit le pointeur, se cale sur la séance la plus proche ; flèches au clavier
+  const reticule = el("svg:line", { y1: m.h, y2: H - m.b, stroke: css("--axis"), "stroke-width": 1, visibility: "hidden" }, svg);
+  const points = series.map(() => el("svg:circle", { r: 4, "stroke-width": 2, stroke: css("--surface"), visibility: "hidden" }, svg));
+  const zone = el("svg:rect", { class: "zone", x: m.g, y: m.h, width: L - m.g - m.d, height: H - m.h - m.b, fill: "transparent", tabindex: 0,
+    "aria-label": "Graphique : flèches gauche et droite pour parcourir les séances" }, svg);
+  let courant = lignes.length - 1;
+  const afficher = (i, cx, cy) => {
+    courant = i; const r = lignes[i];
+    reticule.setAttribute("x1", X(i)); reticule.setAttribute("x2", X(i)); reticule.setAttribute("visibility", "visible");
+    series.forEach((s, k) => {
+      const v = s.valeur(r), c = avecSigne ? css(v >= 0 ? "--gain" : "--perte") : css(s.couleur);
+      Object.entries({ cx: X(i), cy: Y(v), fill: c, visibility: "visible" }).forEach(([a, b]) => points[k].setAttribute(a, b));
+    });
+    const box = svg.getBoundingClientRect();
+    montrerBulle(dateLongue(r.date), series.map(s => {
+      const v = s.valeur(r);
+      return { valeur: avecSigne ? signe(v, eur) : eur.format(v), nom: s.nom,
+               couleur: avecSigne ? css(v >= 0 ? "--gain" : "--perte") : css(s.couleur) };
+    }), cx ?? box.left + X(i), cy ?? box.top + m.h + 20);
+  };
+  const masquer = () => { reticule.setAttribute("visibility", "hidden"); points.forEach(p => p.setAttribute("visibility", "hidden")); cacherBulle(); };
+  zone.addEventListener("pointermove", e => {
+    const x = e.clientX - svg.getBoundingClientRect().left;
+    const i = lignes.length === 1 ? 0 : Math.round((x - m.g) / ((L - m.g - m.d) / (lignes.length - 1)));
+    afficher(Math.max(0, Math.min(lignes.length - 1, i)), e.clientX, e.clientY);
+  });
+  zone.addEventListener("pointerleave", masquer);
+  zone.addEventListener("focus", () => afficher(courant));
+  zone.addEventListener("blur", masquer);
+  zone.addEventListener("keydown", e => {
+    const pas = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (pas) { e.preventDefault(); afficher(Math.max(0, Math.min(lignes.length - 1, courant + pas))); }
+  });
+
+  // Étiquette directe sur la dernière valeur (série principale)
+  const s0 = series[0], dern = lignes[lignes.length - 1], v0 = s0.valeur(dern);
+  const fin = el("svg:circle", { cx: X(lignes.length - 1), cy: Y(v0), r: 4, "stroke-width": 2, stroke: css("--surface"),
+    fill: avecSigne ? css(v0 >= 0 ? "--gain" : "--perte") : css(s0.couleur) }, svg);
+  svg.insertBefore(fin, reticule);
+}
+
+// ---------- Barres horizontales ----------
+// items : [{ nom, valeur, texte, details: [[libellé, valeur]] }]
+function barres(conteneur, items, { divergent = false } = {}) {
+  conteneur.replaceChildren();
+  if (!items.length) { el("div", { class: "vide" }, conteneur, "Aucune position."); return; }
+  const max = Math.max(...items.map(i => Math.abs(i.valeur)), 1e-9);
+  const minV = Math.min(0, ...items.map(i => i.valeur)), maxV = Math.max(0, ...items.map(i => i.valeur));
+  // Marge de 64 px de chaque côté pour l'étiquette de valeur en bout de barre
+  const pos = v => divergent ? `calc(64px + (100% - 128px) * ${(v - minV) / ((maxV - minV) || 1)})`
+                             : `calc((100% - 64px) * ${v / max})`;
+  for (const it of items) {
+    const ligne = el("div", { class: "ligne" }, conteneur);
+    el("div", { class: "nom", title: it.nom }, ligne, it.nom);
+    const piste = el("div", { class: "piste", tabindex: 0, "aria-label": `${it.nom} : ${it.texte}` }, ligne);
+    const couleur = divergent ? (it.valeur >= 0 ? "var(--gain)" : "var(--perte)") : "var(--serie)";
+    const b = el("div", { class: "barre" }, piste);
+    b.style.background = couleur;
+    const etiquette = el("span", { class: "valeur" }, piste, it.texte);
+    if (divergent) {
+      el("div", { class: "zero" }, piste).style.left = pos(0);
+      const [a, z] = it.valeur >= 0 ? [0, it.valeur] : [it.valeur, 0];
+      b.style.left = pos(a); b.style.width = `calc(${pos(z)} - ${pos(a)})`;
+      b.style.borderRadius = it.valeur >= 0 ? "0 4px 4px 0" : "4px 0 0 4px";
+      if (it.valeur >= 0) etiquette.style.left = `calc(${pos(z)} + 6px)`;
+      else etiquette.style.right = `calc(100% - ${pos(a)} + 6px)`;
+    } else {
+      b.style.left = "0"; b.style.width = pos(it.valeur); b.style.borderRadius = "0 4px 4px 0";
+      etiquette.style.left = `calc(${pos(it.valeur)} + 6px)`;
+    }
+    const montrer = (x, y) => montrerBulle(it.nom, it.details.map(([v, n, classe]) => ({ nom: n, valeur: v, classe })), x, y);
+    piste.addEventListener("pointermove", e => montrer(e.clientX, e.clientY));
+    piste.addEventListener("pointerleave", cacherBulle);
+    piste.addEventListener("focus", () => { const r = piste.getBoundingClientRect(); montrer(r.left + r.width / 2, r.top); });
+    piste.addEventListener("blur", cacherBulle);
+  }
+}
+
+// ---------- Tableau triable ----------
+function tableau(table, colonnes, lignes, triInitial) {
+  let tri = triInitial;
+  const dessiner = () => {
+    const c = colonnes.find(c => c.cle === tri.cle);
+    const tries = [...lignes].sort((a, b) => {
+      const va = c.tri ? c.tri(a) : a[c.cle], vb = c.tri ? c.tri(b) : b[c.cle];
+      return (va < vb ? -1 : va > vb ? 1 : 0) * tri.sens;
+    });
+    table.replaceChildren();
+    const tr = el("tr", {}, el("thead", {}, table));
+    for (const col of colonnes) {
+      const th = el("th", { class: col.n ? "n" : "", "data-tri": col.cle, scope: "col" }, tr, col.titre);
+      if (col.cle === tri.cle) th.setAttribute("aria-sort", tri.sens > 0 ? "ascending" : "descending");
+      th.addEventListener("click", () => { tri = { cle: col.cle, sens: tri.cle === col.cle ? -tri.sens : (col.n ? -1 : 1) }; dessiner(); });
+    }
+    const tbody = el("tbody", {}, table);
+    for (const l of tries) {
+      const r = el("tr", {}, tbody);
+      for (const col of colonnes) {
+        const td = el("td", { class: col.n ? "n" : "" }, r);
+        col.rendu ? col.rendu(td, l) : (td.textContent = col.format ? col.format(l[col.cle], l) : l[col.cle] ?? "");
+      }
+    }
+  };
+  dessiner();
+}
+const cellulePV = fmt => (td, v) => { td.textContent = v == null ? "" : signe(v, fmt); if (v) td.className = "n " + (v > 0 ? "gain-txt" : "perte-txt"); };
+
+// ---------- Partage d'une transaction ----------
+const coursFmt = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const actions = n => `${nb.format(n)} action${n > 1 ? "s" : ""}`;
+function textePartage(t) {
+  const debut = `${t.sens === "ACHAT" ? "Achat" : "Vente"} de ${actions(t.quantite)} ${t.libelle} (${t.isin}) au cours de ${coursFmt.format(t.cours)} (frais : ${eur.format(t.couts)}${t.provisoire ? ", hors commission" : ""})`;
+  if (t.sens === "ACHAT")
+    return t.qte_avant > 0
+      ? `${debut}, mon PRU devient ${eur.format(t.pru_apres)} pour ${actions(t.qte_apres)} au total.`
+      : `${debut}.`;
+  const pv = `plus-value réalisée de ${signe(t.pv_operation, eur)}`;
+  return t.qte_apres > 0
+    ? `${debut}, ${pv}, il m'en reste ${nb.format(t.qte_apres)} (PRU ${eur.format(t.pru_apres)}).`
+    : `${debut}, ${pv}, ligne soldée.`;
+}
+async function partager(bouton, t) {
+  const texte = textePartage(t);
+  const confirmer = libelle => {
+    bouton.textContent = libelle; bouton.classList.add("fait");
+    setTimeout(() => { bouton.textContent = "Partager"; bouton.classList.remove("fait"); }, 2000);
+  };
+  if (navigator.share) {
+    try { await navigator.share({ text: texte }); return; }
+    catch (e) { if (e.name === "AbortError") return; }
+  }
+  try { await navigator.clipboard.writeText(texte); confirmer("Copié ✓"); return; } catch {}
+  // Dernier recours : le texte sélectionné, prêt à copier
+  let zone = bouton.parentElement.querySelector(".texte-partage");
+  if (!zone) zone = el("textarea", { class: "texte-partage", rows: 3, readonly: "" }, bouton.parentElement);
+  zone.value = texte; zone.select();
+}
+
+// ---------- Assemblage ----------
+const H = D.historique, P = D.positions;
+const dernier = H[H.length - 1], veille = H[H.length - 2];
+const totalValo = P.reduce((s, p) => s + (p.valorisation ?? p.montant_investi), 0);
+
+document.getElementById("sous-titre").textContent = dernier
+  ? `Cours de clôture du ${dateLongue(dernier.date)} · mis à jour le ${D.genere_le}`
+  : `Mis à jour le ${D.genere_le}`;
+
+(function kpis() {
+  const k = document.getElementById("kpis");
+  const tuile = (label, valeur, delta, hero) => {
+    const t = el("div", { class: "tuile" + (hero ? " hero" : "") }, k);
+    el("div", { class: "label" }, t, label);
+    el("div", { class: "valeur" }, t, valeur);
+    if (delta) el("div", { class: "delta " + (delta.v > 0 ? "gain" : delta.v < 0 ? "perte" : "") }, t,
+                  (delta.v > 0 ? "▲ " : delta.v < 0 ? "▼ " : "") + delta.texte);
+  };
+  if (!dernier) { tuile("Valorisation", "—", null, true); return; }
+  const pvPct = dernier.plus_value_latente / dernier.montant_investi;
+  tuile("Valorisation", eur0.format(dernier.valorisation),
+        { v: dernier.plus_value_latente, texte: `${signe(dernier.plus_value_latente, eur)} (${signe(pvPct, pct)}) de plus-value latente` }, true);
+  if (veille) {
+    const v = dernier.plus_value_latente - veille.plus_value_latente;
+    const base = veille.valorisation + (dernier.montant_investi - veille.montant_investi);
+    tuile("Dernière séance", signe(v, eur), { v, texte: signe(v / base, pct) });
+  }
+  tuile("Montant investi", eur0.format(dernier.montant_investi), { v: 0, texte: `${P.length} lignes` });
+  tuile("Plus-value réalisée", signe(dernier.plus_value_realisee, eur), { v: 0, texte: "ventes cumulées" });
+  tuile("Frais payés", eur.format(D.frais), { v: 0, texte: `${D.transactions.length} opérations` });
+})();
+
+// Période (mémorisée localement si possible)
+let mois = 0;
+try { mois = Number(localStorage.getItem("pea-periode") ?? 0); } catch {}
+function filtrer() {
+  if (!mois || !dernier) return H;
+  const limite = jour(dernier.date); limite.setMonth(limite.getMonth() - mois);
+  const iso = limite.toISOString().slice(0, 10);
+  return H.filter(r => r.date >= iso);
+}
+function dessinerEvolution() {
+  const lignes = filtrer();
+  grapheLigne(document.getElementById("g-valorisation"), { lignes, series: [
+    { nom: "Valorisation", valeur: r => r.valorisation, couleur: "--serie", aire: true },
+    { nom: "Montant investi", valeur: r => r.montant_investi, couleur: "--contexte" },
+  ] });
+  grapheLigne(document.getElementById("g-plus-value"), { lignes, signe: true, hauteur: 220, series: [
+    { nom: "Plus-value latente", valeur: r => r.plus_value_latente, aire: true },
+  ] });
+}
+const boutons = document.querySelectorAll("#periodes button");
+function choisirPeriode(m) {
+  mois = m;
+  boutons.forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.mois) === m)));
+  try { localStorage.setItem("pea-periode", String(m)); } catch {}
+  dessinerEvolution();
+}
+boutons.forEach(b => b.addEventListener("click", () => choisirPeriode(Number(b.dataset.mois))));
+
+function dessinerBarres() {
+  const detailsPosition = p => [
+    [eur.format(p.valorisation ?? 0), "valorisation"],
+    [signe(p.plus_value_latente ?? 0, eur), "plus-value latente", (p.plus_value_latente ?? 0) >= 0 ? "gain-txt" : "perte-txt"],
+    [`${nb.format(p.quantite)} × ${eur.format(p.cours ?? 0)}`, "quantité × cours"],
+    [eur.format(p.pru), "PRU"],
+  ];
+  barres(document.getElementById("b-performance"),
+    [...P].filter(p => p.plus_value_pct != null).sort((a, b) => b.plus_value_pct - a.plus_value_pct)
+      .map(p => ({ nom: p.libelle, valeur: p.plus_value_pct, texte: signe(p.plus_value_pct / 100, pct), details: detailsPosition(p) })),
+    { divergent: true });
+  barres(document.getElementById("b-poids"),
+    P.map(p => ({ nom: p.libelle, valeur: (p.valorisation ?? 0) / totalValo,
+                  texte: pct.format((p.valorisation ?? 0) / totalValo), details: detailsPosition(p) })));
+  const regrouper = cle => {
+    const g = new Map();
+    for (const p of P) {
+      const k = p[cle] || "Non renseigné", e = g.get(k) || { valo: 0, pv: 0, lignes: [] };
+      e.valo += p.valorisation ?? 0; e.pv += p.plus_value_latente ?? 0; e.lignes.push(p.libelle); g.set(k, e);
+    }
+    return [...g].sort((a, b) => b[1].valo - a[1].valo).map(([k, e]) => ({
+      nom: k, valeur: e.valo / totalValo, texte: pct.format(e.valo / totalValo),
+      details: [[eur.format(e.valo), "valorisation"],
+                [signe(e.pv, eur), "plus-value latente", e.pv >= 0 ? "gain-txt" : "perte-txt"],
+                [String(e.lignes.length), e.lignes.length > 1 ? "lignes" : "ligne"]],
+    }));
+  };
+  barres(document.getElementById("b-secteurs"), regrouper("secteur"));
+  barres(document.getElementById("b-pays"), regrouper("pays"));
+}
+
+tableau(document.getElementById("t-positions"), [
+  { cle: "libelle", titre: "Valeur", rendu: (td, p) => {
+      td.textContent = p.libelle;
+      if (p.provisoires) el("span", { class: "badge", title: "Saisi depuis le suivi des ordres : commission non connue, avis d'opéré attendu" }, td, "provisoire");
+      el("span", { class: "isin" }, td, `${p.isin} · ${p.symbole ?? ""}`); } },
+  { cle: "secteur", titre: "Secteur" },
+  { cle: "quantite", titre: "Qté", n: true, format: v => nb.format(v) },
+  { cle: "pru", titre: "PRU", n: true, format: v => eur.format(v) },
+  { cle: "cours", titre: "Cours", n: true, format: v => v == null ? "" : eur.format(v) },
+  { cle: "montant_investi", titre: "Investi", n: true, format: v => eur.format(v) },
+  { cle: "valorisation", titre: "Valorisation", n: true, format: v => v == null ? "" : eur.format(v) },
+  { cle: "plus_value_latente", titre: "+/− value", n: true, rendu: (td, p) => cellulePV(eur)(td, p.plus_value_latente) },
+  { cle: "plus_value_pct", titre: "%", n: true, rendu: (td, p) => cellulePV(pct)(td, p.plus_value_pct == null ? null : p.plus_value_pct / 100) },
+  { cle: "poids", titre: "Poids", n: true, tri: p => p.valorisation ?? 0, rendu: (td, p) => { td.textContent = pct.format((p.valorisation ?? 0) / totalValo); } },
+], P, { cle: "valorisation", sens: -1 });
+
+tableau(document.getElementById("t-historique"), [
+  { cle: "date", titre: "Date", format: v => dateLongue(v) },
+  { cle: "montant_investi", titre: "Investi", n: true, format: v => eur.format(v) },
+  { cle: "valorisation", titre: "Valorisation", n: true, format: v => eur.format(v) },
+  { cle: "plus_value_latente", titre: "+/− value latente", n: true, rendu: (td, r) => cellulePV(eur)(td, r.plus_value_latente) },
+  { cle: "plus_value_realisee", titre: "+/− value réalisée", n: true, rendu: (td, r) => cellulePV(eur)(td, r.plus_value_realisee) },
+], H, { cle: "date", sens: -1 });
+
+document.getElementById("resume-transactions").textContent = `Voir les ${D.transactions.length} opérations`;
+tableau(document.getElementById("t-transactions"), [
+  { cle: "partage", titre: "", tri: t => t.date_execution, rendu: (td, t) => {
+      const b = el("button", { class: "partager", type: "button", title: textePartage(t),
+                               "aria-label": `Partager : ${textePartage(t)}` }, td, "Partager");
+      b.addEventListener("click", () => partager(b, t)); } },
+  { cle: "date_execution", titre: "Date", format: v => `${jour(v.slice(0, 10)).toLocaleDateString("fr-FR")} ${v.slice(11, 16)}` },
+  { cle: "type_transaction", titre: "Opération" },
+  { cle: "libelle", titre: "Valeur", rendu: (td, t) => {
+      td.textContent = t.libelle;
+      if (t.provisoire) el("span", { class: "badge", title: "Commission non connue, avis d'opéré attendu" }, td, "provisoire");
+      el("span", { class: "isin" }, td, t.isin); } },
+  { cle: "quantite", titre: "Qté", n: true, format: v => nb.format(v) },
+  { cle: "cours", titre: "Cours", n: true, format: v => coursFmt.format(v) },
+  { cle: "montant_brut", titre: "Brut", n: true, format: v => eur.format(v) },
+  { cle: "couts", titre: "Frais", n: true, format: v => eur.format(v) },
+  { cle: "montant_net", titre: "Net", n: true, format: v => eur.format(v) },
+  { cle: "reference", titre: "Référence" },
+], D.transactions, { cle: "date_execution", sens: -1 });
+
+// Rendu initial, puis au redimensionnement et au changement de thème
+choisirPeriode(mois);
+dessinerBarres();
+let attente;
+new ResizeObserver(() => { clearTimeout(attente); attente = setTimeout(dessinerEvolution, 80); })
+  .observe(document.querySelector("main"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", dessinerEvolution);
+</script>
+</body>
+</html>
