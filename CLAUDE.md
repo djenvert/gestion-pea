@@ -13,9 +13,11 @@ python3 pea.py traiter      # traite inbox/ (PDF et .txt), archive dans outbox/A
 python3 pea.py recalculer   # reconstruit valeurs + historique depuis transactions, puis le tableau
 python3 pea.py cours        # récupère les clôtures manquantes (réseau), puis historique + tableau
 python3 pea.py tableau      # régénère seulement tableau.html
-python3 exemple.py          # tableau_exemple.html : données fictives (graine fixe), publiable
+python3 pea.py bilan [AAAA-MM-JJ]   # cours (sans date) puis bilans/bilan_AAAA-Sss.png + notification
+python3 pea.py planifier-bilan vendredi 19:00   # (ré)installe l'agent launchd du bilan ; « aucun » le retire
+python3 exemple.py          # tableau_exemple.html + bilan_exemple.png : données fictives (graine fixe), publiables
 
-python3 -m unittest tests/test_parser.py tests/test_anonymat.py                 # tous les tests
+python3 -m unittest tests/test_parser.py tests/test_anonymat.py tests/test_bilan.py   # tous les tests
 python3 -m unittest tests.test_parser.TestParser.test_achat_bourse_etrangere    # un test
 
 pdftotext -layout fichier.pdf -   # inspecter la mise en page d'un nouvel avis avant d'adapter le parseur
@@ -29,7 +31,8 @@ Les tests utilisent une base SQLite en mémoire : ils ne touchent jamais `pea.db
 
 - `~/Library/LaunchAgents/com.guillaume.gestion-pea.plist` : `WatchPaths` sur `inbox/` lance `pea.py traiter`.
 - `~/Library/LaunchAgents/com.guillaume.gestion-pea-cours.plist` : `pea.py cours`, du lundi au vendredi à 18h30.
-- Sortie des deux agents : `~/Library/Logs/gestion-pea-launchd.log` ; journal applicatif : `logs/pea.log`.
+- `~/Library/LaunchAgents/com.gestion-pea.bilan.plist` : `pea.py bilan`, écrit par `pea.py planifier-bilan` (ne pas l'éditer à la main).
+- Sortie des agents : `~/Library/Logs/gestion-pea-launchd.log` ; journal applicatif : `logs/pea.log`.
 
 Les agents tournent avec un PATH minimal : garder des chemins absolus. `pea.py` prend un verrou (`.pea.lock`) : un seul traitement à la fois. Attention, déposer un fichier dans `inbox/` déclenche un vrai import dans `pea.db`. Pour tester, passer par les tests unitaires plutôt que par l'inbox.
 
@@ -52,6 +55,10 @@ Flux : `parser_avis.lire()` → `db.inserer()` → `db.recalculer_valeurs()` + `
 - `verifier()` exige brut ± coûts = net, et quantité × cours ≈ brut. Tout avis qui échoue part dans `erreurs/` au lieu d'entrer en base.
 - `parse_ordre()` lit un copier-coller du « suivi des ordres » du site de la banque déposé en `.txt`. La commission y est inconnue : la transaction est inscrite avec `provisoire = 1`. L'avis PDF de même `reference` (le n° d'ordre, ex. `G260921U5177`) la remplacera. `db.inserer()` renvoie `importé`, `remplacé` ou `doublon`.
 - Rapprochement : le `solde_titres` des avis au comptant est comparé à la quantité en base en fin de journée, et un écart produit un avertissement dans le log. La base est volontairement incomplète : le titulaire n'a pas tous les avis.
+
+### Bilan de la semaine (`bilan.py`)
+
+`bilan.donnees()` calcule la semaine ISO de la date de référence (ou la dernière semaine cotée) depuis `historique`, `transactions` et `cours`. `bilan.rendre()` injecte le JSON dans `bilan_modele.html` (1600 × 900) et capture la page en PNG ×2 avec Chrome headless. Ne pas passer `--user-data-dir` à Chrome : il bloque alors indéfiniment. Performance de la semaine = Δ(plus-value latente + réalisée), donc hors versements. Le bilan utilise vert = hausse et rouge = baisse (demande explicite), toujours doublés d'un signe et d'une flèche. Les tests (`tests/test_bilan.py`) utilisent la base fictive `exemple.base()`.
 
 ### Tableau de bord
 

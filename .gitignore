@@ -10,6 +10,7 @@ pea.db-journal
 
 # Généré à chaque import ou mise à jour des cours (contient le portefeuille)
 tableau.html
+bilans/
 
 # Vrais avis d'opéré : nom, adresse et numéros de compte
 tests/fixtures/*.pdf

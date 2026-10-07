@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Bilan de la semaine</title>
+<style>
+:root {
+  --page: #f6f5f0;
+  --surface: #fdfdfb;
+  --ink: #111110;
+  --ink-2: #55544f;
+  --muted: #8b8a84;
+  --grid: #e4e3dc;
+  --border: rgba(17,17,16,0.09);
+  --serie: #2a78d6;
+  --contexte: #9a998f;
+  --bande: rgba(42,120,214,0.08);
+  /* Hausse en vert, baisse en rouge : toujours doublés d'un signe et d'une flèche */
+  --hausse: #137a36; --hausse-fond: #e8f5ec; --hausse-bord: #bfe3c9; --hausse-barre: #2e9e55;
+  --baisse: #be2329; --baisse-fond: #fcebeb; --baisse-bord: #f2c4c4; --baisse-barre: #dc4b4f;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1600px; height: 900px; overflow: hidden; }
+body {
+  background: var(--page); color: var(--ink);
+  font: 16px/1.4 -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+  padding: 36px 48px 28px; display: flex; flex-direction: column; gap: 22px;
+  border-top: 6px solid var(--serie);
+}
+.num { font-variant-numeric: tabular-nums; }
+header { display: flex; justify-content: space-between; align-items: flex-end; }
+.marque { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 22px; }
+.marque svg { display: block; }
+.titre { text-align: right; }
+.titre h1 { margin: 0; font-size: 40px; letter-spacing: -0.02em; font-weight: 750; }
+.titre p { margin: 2px 0 0; color: var(--ink-2); font-size: 17px; }
+.exemple { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 6px;
+           background: #fff3cd; color: #7a5a00; font-size: 13px; font-weight: 600; vertical-align: 3px; }
+
+.grille { flex: 1; display: grid; grid-template-columns: 470px 1fr; gap: 22px; min-height: 0; }
+.colonne { display: flex; flex-direction: column; gap: 22px; min-height: 0; }
+.carte { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px 26px; }
+.carte h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 650; }
+
+.valeur { font-size: 64px; font-weight: 750; letter-spacing: -0.03em; line-height: 1.05; margin: 4px 0 18px; }
+.tendances { display: grid; gap: 12px; }
+.tendance { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.tendance .libelle { color: var(--ink-2); font-size: 15px; }
+.pastille { display: inline-flex; gap: 10px; align-items: baseline; padding: 6px 12px; border-radius: 9px;
+            border: 1px solid; font-weight: 650; font-size: 18px; white-space: nowrap; }
+.pastille small { font-size: 15px; font-weight: 550; opacity: 0.9; }
+.hausse { color: var(--hausse); background: var(--hausse-fond); border-color: var(--hausse-bord); }
+.baisse { color: var(--baisse); background: var(--baisse-fond); border-color: var(--baisse-bord); }
+.neutre { color: var(--ink-2); background: var(--page); border-color: var(--border); }
+.note { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+
+.duel { flex: 1; display: grid; gap: 12px; align-content: start; }
+.case { border: 1px solid; border-radius: 12px; padding: 12px 16px; display: grid;
+        grid-template-columns: 1fr auto; column-gap: 12px; align-items: center; }
+.case .etiquette { grid-column: 1 / -1; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 650; margin-bottom: 4px; }
+.case .nom { color: var(--ink); font-weight: 650; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.case .detail { color: var(--ink-2); font-size: 13px; }
+.case .pct { font-size: 26px; font-weight: 750; text-align: right; grid-row: 2 / 4; grid-column: 2; }
+.case .pct small { display: block; font-size: 14px; font-weight: 550; }
+
+.graphe { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.legende { display: flex; gap: 18px; color: var(--ink-2); font-size: 14px; margin: -4px 0 6px; }
+.legende span::before { content: ""; display: inline-block; width: 16px; height: 3px; border-radius: 2px;
+                        background: var(--c); vertical-align: middle; margin-right: 6px; }
+.graphe svg { flex: 1; width: 100%; min-height: 0; }
+svg text { font: 13px -apple-system, system-ui, sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
+
+.bas { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; height: 236px; }
+.jours { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 14px; height: 150px; align-items: stretch; }
+.jour { display: grid; grid-template-rows: 1fr 1fr auto; text-align: center; font-size: 13px; }
+.jour .haut, .jour .basse { position: relative; }
+.jour .barre { position: absolute; left: 22%; right: 22%; border-radius: 5px; }
+.jour .haut .barre { bottom: 0; background: var(--hausse-barre); border-radius: 5px 5px 0 0; }
+.jour .basse .barre { top: 0; background: var(--baisse-barre); border-radius: 0 0 5px 5px; }
+.jour .haut { border-bottom: 1px solid var(--grid); }
+.jour .montant { position: absolute; left: 0; right: 0; font-weight: 650; font-size: 13px; }
+.jour .nomjour { color: var(--ink-2); padding-top: 6px; }
+
+.barometre .split { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin: 6px 0 10px; background: var(--grid); }
+.barometre .split div { height: 100%; }
+.barometre .compte { display: flex; justify-content: space-between; font-size: 15px; font-weight: 600; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.badge { padding: 5px 11px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--page); border: 1px solid var(--border); color: var(--ink-2); }
+
+footer { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; margin-top: -6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="marque">
+    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+      <rect width="40" height="40" rx="10" fill="#2a78d6"/>
+      <rect x="9" y="22" width="5" height="9" rx="1.5" fill="#fff" opacity="0.7"/>
+      <rect x="17.5" y="16" width="5" height="15" rx="1.5" fill="#fff" opacity="0.85"/>
+      <rect x="26" y="9" width="5" height="22" rx="1.5" fill="#fff"/>
+    </svg>
+    <span>Mon PEA</span>
+  </div>
+  <div class="titre">
+    <h1 id="titre"></h1>
+    <p id="periode"></p>
+  </div>
+</header>
+
+<div class="grille">
+  <div class="colonne">
+    <section class="carte">
+      <h2>Valorisation en fin de semaine</h2>
+      <div class="valeur num" id="valeur"></div>
+      <div class="tendances" id="tendances"></div>
+      <p class="note" id="versements"></p>
+    </section>
+    <section class="carte duel" id="duel">
+      <h2>Top et flop de la semaine</h2>
+    </section>
+  </div>
+
+  <div class="colonne">
+    <section class="carte graphe">
+      <h2>Évolution du portefeuille</h2>
+      <div class="legende"><span style="--c: var(--serie)">Valorisation</span><span style="--c: var(--contexte)">Montant investi</span></div>
+      <svg id="courbe" preserveAspectRatio="none"></svg>
+    </section>
+    <div class="bas">
+      <section class="carte">
+        <h2>La semaine jour par jour</h2>
+        <div class="jours" id="jours"></div>
+      </section>
+      <section class="carte barometre">
+        <h2>Baromètre des lignes</h2>
+        <div class="compte num" id="compte"></div>
+        <div class="split" id="split"></div>
+        <div class="badges" id="badges"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span id="pied"></span>
+  <span>Performance hors versements : variation de la plus-value latente et réalisée, frais inclus.</span>
+</footer>
+
+<script>
+const D = /*__DONNEES__*/null;
+
+const eur0 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const eur2 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
+const pct2 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const compact = new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
+const signe = v => (v > 0 ? "+" : v < 0 ? "−" : "");
+const fleche = v => (v > 0 ? "▲ " : v < 0 ? "▼ " : "");
+const sens = v => (v > 0 ? "hausse" : v < 0 ? "baisse" : "neutre");
+const euros = (v, fmt = eur2) => signe(v) + fmt.format(Math.abs(v));
+const pourcent = v => v == null ? "—" : `${signe(v)}${pct2.format(Math.abs(v))} %`;
+const jourLong = d => new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+function el(tag, attrs = {}, parent, texte) {
+  const svg = tag.startsWith("svg:");
+  const e = svg ? document.createElementNS("http://www.w3.org/2000/svg", tag.slice(4)) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (texte != null) e.textContent = texte;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+// En-tête
+document.getElementById("titre").textContent = `Bilan de la semaine — ${D.semaine}`;
+const periodeEl = document.getElementById("periode");
+periodeEl.textContent = D.periode.charAt(0).toUpperCase() + D.periode.slice(1);
+if (D.exemple) el("span", { class: "exemple" }, periodeEl, "données fictives");
+document.getElementById("pied").textContent = `Cours de clôture du ${jourLong(D.date_fin)}`;
+
+// Valorisation et tendances
+document.getElementById("valeur").textContent = eur0.format(D.valorisation);
+const tendances = document.getElementById("tendances");
+for (const [libelle, p, e] of [["Sur la semaine", D.semaine_pct, D.semaine_euros],
+                                ["Depuis le début", D.total_pct, D.total_euros]]) {
+  const ligne = el("div", { class: "tendance" }, tendances);
+  el("span", { class: "libelle" }, ligne, libelle);
+  const pastille = el("span", { class: `pastille num ${sens(e)}` }, ligne, fleche(e) + pourcent(p));
+  el("small", {}, pastille, euros(e));
+}
+if (Math.abs(D.versements) >= 1) {
+  document.getElementById("versements").textContent = D.versements > 0
+    ? `${eur0.format(D.versements)} investis cette semaine, non comptés dans la performance.`
+    : `${eur0.format(-D.versements)} retirés cette semaine (ventes), non comptés dans la performance.`;
+}
+
+// Top et flop
+const duel = document.getElementById("duel");
+const meilleure = D.lignes[0], pire = D.lignes.length > 1 ? D.lignes[D.lignes.length - 1] : null;
+for (const [etiquette, l] of [["Top de la semaine", meilleure], ["Flop de la semaine", pire]]) {
+  if (!l) continue;
+  const c = el("div", { class: `case ${sens(l.pct)}` }, duel);
+  el("div", { class: "etiquette" }, c, etiquette);
+  el("div", { class: "nom" }, c, l.libelle);
+  el("div", { class: "pct num" }, c, fleche(l.pct) + pourcent(l.pct));
+  el("small", {}, c.lastChild, euros(l.euros));
+  el("div", { class: "detail" }, c, [l.symbole, l.nouvelle ? "entrée cette semaine" : null].filter(Boolean).join(" · "));
+}
+
+// Courbe : valorisation et montant investi, semaine en surbrillance
+(function courbe() {
+  const svg = document.getElementById("courbe");
+  const { width: W, height: H } = svg.getBoundingClientRect();
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const h = D.historique, g = 64, d = 8, hautM = 8, basM = 26;
+  const valeurs = h.flatMap(r => [r.valorisation, r.investi]);
+  let min = Math.min(...valeurs), max = Math.max(...valeurs);
+  const marge = (max - min) * 0.08 || max * 0.05 || 1; min -= marge; max += marge;
+  const pas = Math.pow(10, Math.floor(Math.log10((max - min) / 4)));
+  const pasY = [1, 2, 2.5, 5, 10].map(m => m * pas).find(p => (max - min) / p <= 5);
+  const X = i => g + (h.length > 1 ? i / (h.length - 1) : 0.5) * (W - g - d);
+  const Y = v => hautM + (1 - (v - min) / (max - min)) * (H - hautM - basM);
+
+  for (let v = Math.ceil(min / pasY) * pasY; v <= max; v += pasY) {
+    el("svg:line", { x1: g, x2: W - d, y1: Y(v), y2: Y(v), stroke: "var(--grid)" }, svg);
+    el("svg:text", { x: g - 10, y: Y(v) + 4, "text-anchor": "end" }, svg, compact.format(v) + " €");
+  }
+  const i0 = h.findIndex(r => r.date >= D.lundi);
+  if (i0 >= 0) {
+    const x0 = X(Math.max(i0 - 0.5, 0)), x1 = X(h.length - 1) + 4;
+    el("svg:rect", { x: x0, y: hautM, width: Math.max(x1 - x0, 8), height: H - hautM - basM, fill: "var(--bande)", rx: 4 }, svg);
+  }
+  // Graduations : un repère par mois, ou quelques dates si l'historique est court
+  const mois = h.map((r, i) => [r.date.slice(0, 7), i]).filter(([m], i, a) => i === 0 || m !== a[i - 1][0]);
+  const reperes = mois.length >= 3 ? mois.map(([m, i]) => [i, new Date(m + "-15").toLocaleDateString("fr-FR", { month: "short" })])
+    : Array.from({ length: Math.min(6, h.length) }, (_, k) => Math.round(k * (h.length - 1) / Math.max(Math.min(6, h.length) - 1, 1)))
+        .map(i => [i, new Date(h[i].date + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })]);
+  for (const [i, texte] of reperes) {
+    const ancre = i === 0 ? "start" : i === h.length - 1 ? "end" : "middle";
+    el("svg:text", { x: X(i), y: H - 6, "text-anchor": ancre }, svg, texte);
+  }
+
+  const chemin = f => h.map((r, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(f(r)).toFixed(1)}`).join("");
+  el("svg:path", { d: `${chemin(r => r.valorisation)}L${X(h.length - 1)},${H - basM}L${X(0)},${H - basM}Z`, fill: "rgba(42,120,214,0.07)" }, svg);
+  el("svg:path", { d: chemin(r => r.investi), fill: "none", stroke: "var(--contexte)", "stroke-width": 2, "stroke-dasharray": "6 5" }, svg);
+  el("svg:path", { d: chemin(r => r.valorisation), fill: "none", stroke: "var(--serie)", "stroke-width": 3, "stroke-linejoin": "round" }, svg);
+  const n = h.length - 1;
+  el("svg:circle", { cx: X(n), cy: Y(h[n].valorisation), r: 6, fill: "var(--serie)", stroke: "#fff", "stroke-width": 2.5 }, svg);
+})();
+
+// Jour par jour
+(function jours() {
+  const zone = document.getElementById("jours");
+  const max = Math.max(...D.jours.map(j => Math.abs(j.gain)), 1);
+  for (const j of D.jours) {
+    const col = el("div", { class: "jour" }, zone);
+    const haut = el("div", { class: "haut" }, col), bas = el("div", { class: "basse" }, col);
+    const zoneBarre = j.gain >= 0 ? haut : bas;
+    const hauteur = 100 * Math.abs(j.gain) / max * 0.62;
+    el("div", { class: "barre", style: `height:${Math.max(hauteur, 2)}%` }, zoneBarre);
+    const m = el("div", { class: `montant num`, style: j.gain >= 0 ? `bottom:${hauteur + 4}%; color:var(--hausse)` : `top:${hauteur + 4}%; color:var(--baisse)` }, zoneBarre, euros(j.gain, eur0));
+    el("div", { class: "nomjour" }, col, j.jour);
+  }
+})();
+
+// Baromètre et faits marquants
+(function barometre() {
+  const hausse = D.lignes.filter(l => l.pct > 0).length, baisse = D.lignes.filter(l => l.pct < 0).length;
+  const stables = D.lignes.length - hausse - baisse;
+  const compte = document.getElementById("compte");
+  el("span", { style: "color:var(--hausse)" }, compte, `▲ ${hausse} en hausse`);
+  if (stables) el("span", { style: "color:var(--ink-2)" }, compte, `${stables} stable${stables > 1 ? "s" : ""}`);
+  el("span", { style: "color:var(--baisse)" }, compte, `${baisse} en baisse ▼`);
+  const split = document.getElementById("split"), total = D.lignes.length || 1;
+  el("div", { style: `width:${100 * hausse / total}%; background:var(--hausse-barre)` }, split);
+  el("div", { style: `width:${100 * stables / total}%; background:var(--contexte)` }, split);
+  el("div", { style: `width:${100 * baisse / total}%; background:var(--baisse-barre)` }, split);
+
+  const badges = document.getElementById("badges");
+  const faits = [];
+  if (D.record) faits.push("🏆 Plus-value record");
+  if (D.serie >= 2) faits.push(`${D.semaine_euros > 0 ? "🔥" : "🧊"} ${D.serie}ᵉ semaine de ${D.semaine_euros > 0 ? "hausse" : "baisse"} d'affilée`);
+  const meilleur = [...D.jours].sort((a, b) => b.gain - a.gain)[0];
+  if (meilleur && meilleur.gain > 0) faits.push(`Meilleure séance : ${new Date(meilleur.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long" })}`);
+  const ecart = D.lignes.length > 1 ? D.lignes[0].pct - D.lignes[D.lignes.length - 1].pct : 0;
+  if (ecart) faits.push(`Écart top / flop : ${pct2.format(ecart)} pts`);
+  for (const f of faits.slice(0, 4)) el("span", { class: "badge" }, badges, f);
+})();
+</script>
+</body>
+</html>

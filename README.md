@@ -16,13 +16,21 @@ On dépose un avis dans `inbox/` : il est lu, vérifié puis enregistré dans un
 - **Cours quotidiens** : clôtures récupérées sur Yahoo Finance. Le symbole et le secteur sont trouvés automatiquement à partir de l'ISIN.
 - **Historique de valorisation** reconstruit jour par jour depuis les transactions.
 - **Tableau de bord** (`tableau.html`) : valorisation et montant investi, plus-value latente, performance et poids par ligne, répartition par secteur et par pays, positions, transactions, avec un bouton « Partager » qui copie le résumé d'une opération. Le fichier fonctionne hors ligne, gère le mode sombre et propose une version tableau de chaque graphique.
+- **Bilan de la semaine** (`bilans/bilan_AAAA-Sss.png`) : une image à partager avec la valorisation, la performance de la semaine et depuis le début (hors versements), le top et le flop, la semaine jour par jour, le nombre de lignes en hausse et en baisse, et les faits marquants (record de plus-value, série de semaines positives). Le bilan est généré chaque semaine au jour et à l'heure choisis, avec une notification macOS.
 - **Automatisation macOS** avec launchd : import dès qu'un fichier arrive dans `inbox/`, mise à jour des cours en semaine à 18h30.
+
+## Bilan de la semaine
+
+![Bilan de la semaine généré avec des données fictives](bilan_exemple.png)
+
+La performance de la semaine est la variation de la plus-value totale (latente + réalisée) : un achat fait dans la semaine n'est pas compté comme un gain. Le top et le flop comparent la dernière clôture de la semaine à celle de la semaine précédente, ou au prix d'achat pour une ligne entrée dans la semaine.
 
 ## Prérequis
 
 - Python 3.10 ou plus récent (bibliothèque standard uniquement)
 - `pdftotext`, fourni par poppler : `brew install poppler`
 - Un accès réseau pour les cours (Yahoo Finance)
+- Google Chrome ou Chromium pour rendre le bilan de la semaine en PNG
 
 Le parseur a été écrit pour les avis d'opéré de Société Générale. Les avis d'une autre banque demanderont d'adapter `parser_avis.py`.
 
@@ -37,11 +45,15 @@ python3 pea.py traiter      # importe inbox/ et archive dans outbox/AAAA-MM/ (ou
 python3 pea.py cours        # récupère les clôtures manquantes, met à jour l'historique et le tableau
 python3 pea.py recalculer   # reconstruit positions et historique depuis les transactions
 python3 pea.py tableau      # régénère seulement tableau.html
+python3 pea.py bilan        # met à jour les cours, puis crée le bilan de la semaine en PNG
+python3 pea.py bilan 2026-09-25        # bilan d'une semaine passée (sans mise à jour des cours)
+python3 pea.py planifier-bilan vendredi 19:00   # bilan automatique chaque semaine
+python3 pea.py planifier-bilan aucun            # arrêter le bilan automatique
 
 open tableau.html
 ```
 
-Pour voir le rendu sans aucune donnée personnelle, `python3 exemple.py` génère `tableau_exemple.html`. Il porte sur un portefeuille fictif de 11 valeurs européennes : les sociétés sont réelles, mais les opérations et les cours sont inventés.
+Pour voir le rendu sans aucune donnée personnelle, `python3 exemple.py` génère `tableau_exemple.html` et `bilan_exemple.png`. Il porte sur un portefeuille fictif de 11 valeurs européennes : les sociétés sont réelles, mais les opérations et les cours sont inventés.
 
 La base `pea.db` est créée au premier lancement. Le journal est écrit dans `logs/pea.log`.
 
@@ -106,7 +118,8 @@ Un verrou (`.pea.lock`) empêche deux traitements de tourner en même temps.
 | `cours_yahoo.py` | Recherche du symbole par ISIN et clôtures quotidiennes sur Yahoo Finance |
 | `tableau.py` | Génère `tableau.html` en injectant les données dans le modèle |
 | `tableau_modele.html` | Modèle du tableau de bord (HTML, SVG et JavaScript natifs) |
-| `exemple.py` | Génère `tableau_exemple.html` avec des données fictives |
+| `bilan.py`, `bilan_modele.html` | Bilan de la semaine : calculs, puis rendu PNG par Chrome headless |
+| `exemple.py` | Génère `tableau_exemple.html` et `bilan_exemple.png` avec des données fictives |
 | `tests/` | Tests unitaires |
 
 La table `transactions` est la seule source de vérité. Les tables `valeurs` (positions, PRU) et `historique` (valorisation quotidienne) en sont dérivées et reconstruites à chaque passage.
@@ -114,7 +127,7 @@ La table `transactions` est la seule source de vérité. Les tables `valeurs` (p
 ## Tests
 
 ```sh
-python3 -m unittest tests/test_parser.py tests/test_anonymat.py
+python3 -m unittest tests/test_parser.py tests/test_anonymat.py tests/test_bilan.py
 ```
 
 Les tests utilisent une base SQLite en mémoire et ne touchent jamais `pea.db`.

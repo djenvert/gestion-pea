@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Génère tableau_exemple.html : le tableau de bord rempli de données fictives.
+"""Génère tableau_exemple.html et bilan_exemple.png à partir de données fictives.
 
 Les sociétés, leurs ISIN, symboles et secteurs sont réels (informations publiques).
 Les opérations, quantités et cours sont inventés : marche aléatoire à graine fixe,
@@ -16,11 +16,13 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
+import bilan
 import db
 import tableau
 
 RACINE = Path(__file__).resolve().parent
 SORTIE = RACINE / "tableau_exemple.html"
+SORTIE_BILAN = RACINE / "bilan_exemple.png"
 DEBUT, FIN = date(2025, 10, 1), date(2026, 9, 30)
 
 # ISIN, libellé, symbole Yahoo, secteur, lieu d'exécution (None = Paris), cours de départ
@@ -117,7 +119,8 @@ def avis(n: int, jour: str, isin: str, sens: str, montant: int, cours: dict) -> 
     }
 
 
-def generer() -> Path:
+def base() -> sqlite3.Connection:
+    """Base SQLite en mémoire remplie du portefeuille fictif (aussi utilisée par les tests)."""
     alea = random.Random(2026)
     cours = cours_fictifs(alea)
     con = sqlite3.connect(":memory:")
@@ -136,11 +139,21 @@ def generer() -> Path:
         db.inserer(con, a, "exemple")
     db.recalculer_valeurs(con)
     db.recalculer_historique(con)
+    return con
+
+
+def generer() -> Path:
+    con = base()
     d = tableau.donnees(con)
     d["exemple"] = True
     d["genere_le"] = f"{FIN:%d/%m/%Y} à 18:30"  # fixe : le fichier ne change pas à chaque génération
-    return tableau.ecrire(d, SORTIE)
+    tableau.ecrire(d, SORTIE)
+    b = bilan.donnees(con, date(2026, 9, 25))  # dernière semaine complète du jeu fictif
+    b["exemple"] = True
+    bilan.rendre(b, SORTIE_BILAN)
+    return SORTIE
 
 
 if __name__ == "__main__":
     print(generer())
+    print(SORTIE_BILAN)

@@ -6,16 +6,24 @@ Usage :
   pea.py recalculer  reconstruit la table `valeurs` depuis `transactions`
   pea.py cours       récupère les clôtures manquantes et met à jour `historique`
   pea.py tableau     régénère le tableau de bord tableau.html
+  pea.py bilan [AAAA-MM-JJ]          met à jour les cours puis crée bilans/bilan_AAAA-Sss.png
+  pea.py planifier-bilan JOUR HH:MM  génère le bilan chaque semaine (ex. vendredi 19:00)
+  pea.py planifier-bilan aucun       arrête la génération automatique
 """
 
 import fcntl
+import inspect
 import logging
+import os
+import plistlib
 import shutil
+import subprocess
 import sys
 import time
 from datetime import date, timedelta
 from pathlib import Path
 
+import bilan as bilan_png
 import cours_yahoo
 import db
 import parser_avis
@@ -170,18 +178,92 @@ def tableau() -> int:
     return 0
 
 
+def notifier(titre: str, message: str) -> None:
+    """Notification macOS (textes passés en arguments, jamais interprétés comme du script)."""
+    subprocess.run(["/usr/bin/osascript", "-e", "on run argv",
+                    "-e", "display notification (item 2 of argv) with title (item 1 of argv)",
+                    "-e", "end run", titre, message], capture_output=True, check=False)
+
+
+def bilan(jour: str | None = None) -> int:
+    """Bilan de la semaine en PNG ; les cours sont d'abord mis à jour (sans bloquer s'ils échouent)."""
+    reference = date.fromisoformat(jour) if jour else date.today()
+    if not jour:
+        cours()
+    try:
+        chemin, d = bilan_png.generer(BASE, reference)
+    except Exception as exc:
+        log.error("Bilan de la semaine non généré : %s", exc)
+        return 1
+    pct = f"{d['semaine_pct']:+.2f} %".replace(".", ",") if d["semaine_pct"] is not None else "—"
+    log.info("Bilan %s : valorisation %.2f €, semaine %+.2f € (%s) → %s", d["semaine"],
+             d["valorisation"], d["semaine_euros"], pct, chemin.relative_to(RACINE))
+    notifier(f"Bilan de la semaine {d['semaine']}",
+             f"{d['valorisation']:,.0f} € · semaine {pct}".replace(",", " "))
+    return 0
+
+
+AGENT_BILAN = Path.home() / "Library" / "LaunchAgents" / "com.gestion-pea.bilan.plist"
+JOURS_SEMAINE = {"dimanche": 0, "lundi": 1, "mardi": 2, "mercredi": 3, "jeudi": 4,
+                 "vendredi": 5, "samedi": 6}
+
+
+def planifier_bilan(jour: str = "", heure: str = "") -> int:
+    """Installe (ou retire avec « aucun ») l'agent launchd qui génère le bilan chaque semaine."""
+    if jour.lower() != "aucun":
+        try:
+            h, m = (int(x) for x in heure.split(":"))
+            if jour.lower() not in JOURS_SEMAINE or not (0 <= h < 24 and 0 <= m < 60):
+                raise ValueError
+        except ValueError:
+            print("Usage : pea.py planifier-bilan JOUR HH:MM (ex. vendredi 19:00), ou « aucun »")
+            return 2
+    domaine = f"gui/{os.getuid()}"
+    subprocess.run(["/bin/launchctl", "bootout", domaine, str(AGENT_BILAN)],
+                   capture_output=True, check=False)
+    if jour.lower() == "aucun":
+        AGENT_BILAN.unlink(missing_ok=True)
+        log.info("Bilan automatique désactivé")
+        return 0
+    journal = str(Path.home() / "Library" / "Logs" / "gestion-pea-launchd.log")
+    AGENT_BILAN.parent.mkdir(parents=True, exist_ok=True)
+    with open(AGENT_BILAN, "wb") as f:
+        plistlib.dump({
+            "Label": "com.gestion-pea.bilan",
+            # python3 du PATH plutôt que sys.executable, qui pointe vers une version précise
+            "ProgramArguments": [shutil.which("python3") or sys.executable, str(RACINE / "pea.py"), "bilan"],
+            "WorkingDirectory": str(RACINE),
+            # Si le Mac dort à l'heure dite, launchd lance le bilan au réveil
+            "StartCalendarInterval": {"Weekday": JOURS_SEMAINE[jour.lower()], "Hour": h, "Minute": m},
+            "StandardOutPath": journal,
+            "StandardErrorPath": journal,
+        }, f)
+    res = subprocess.run(["/bin/launchctl", "bootstrap", domaine, str(AGENT_BILAN)],
+                         capture_output=True, text=True, check=False)
+    if res.returncode != 0:
+        log.error("launchctl bootstrap a échoué : %s", res.stderr.strip())
+        return 1
+    log.info("Bilan automatique chaque %s à %02d:%02d (%s)", jour.lower(), h, m, AGENT_BILAN)
+    return 0
+
+
 def main() -> int:
     configurer_logs()
     commande = sys.argv[1] if len(sys.argv) > 1 else "traiter"
     commandes = {"traiter": traiter, "recalculer": recalculer, "cours": cours,
-                 "tableau": tableau}
+                 "tableau": tableau, "bilan": bilan, "planifier-bilan": planifier_bilan}
     if commande not in commandes:
         print(__doc__)
         return 2
     # Un seul traitement à la fois (launchd peut relancer pendant une exécution)
     with open(RACINE / ".pea.lock", "w") as verrou:
         fcntl.flock(verrou, fcntl.LOCK_EX)
-        return commandes[commande]()
+        try:
+            inspect.signature(commandes[commande]).bind(*sys.argv[2:])
+        except TypeError:  # nombre d'arguments incorrect
+            print(__doc__)
+            return 2
+        return commandes[commande](*sys.argv[2:])
 
 
 if __name__ == "__main__":
