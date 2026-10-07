@@ -69,7 +69,8 @@ h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
 .segments { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
             background: var(--surface); }
 .segments button { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: 0;
-                   padding: 5px 12px; cursor: pointer; }
+                   padding: 5px 12px; cursor: pointer; white-space: nowrap; }
+@media (max-width: 520px) { .segments button { padding: 5px 8px; } }
 .segments button + button { border-left: 1px solid var(--border); }
 .segments button:hover { background: var(--wash); }
 .segments button[aria-pressed="true"] { color: var(--ink); font-weight: 600; background: var(--wash); }
@@ -150,9 +151,9 @@ td .isin { color: var(--muted); font-size: 11px; display: block; }
   <div class="filtres" role="group" aria-label="Période des graphiques d'évolution">
     <span class="label">Période</span>
     <div class="segments" id="periodes">
-      <button data-mois="1">1 mois</button><button data-mois="3">3 mois</button>
-      <button data-mois="6">6 mois</button><button data-mois="12">1 an</button>
-      <button data-mois="0">Tout</button>
+      <button data-periode="1s">1 semaine</button><button data-periode="1m">1 mois</button>
+      <button data-periode="3m">3 mois</button><button data-periode="6m">6 mois</button>
+      <button data-periode="12m">1 an</button><button data-periode="tout">Tout</button>
     </div>
   </div>
 
@@ -482,12 +483,20 @@ document.getElementById("sous-titre").textContent = dernier
   tuile("Frais payés", eur.format(D.frais), { v: 0, texte: `${D.transactions.length} opérations` });
 })();
 
-// Période (mémorisée localement si possible)
-let mois = 0;
-try { mois = Number(localStorage.getItem("pea-periode") ?? 0); } catch {}
+// Période (mémorisée localement si possible) : "1s" = 1 semaine, "3m" = 3 mois, "tout"
+let periode = "tout";
+try {
+  const memo = localStorage.getItem("pea-periode");
+  // Anciennes versions : nombre de mois, 0 pour tout
+  if (/^\d+$/.test(memo ?? "")) periode = memo === "0" ? "tout" : `${memo}m`;
+  else if (document.querySelector(`#periodes [data-periode="${memo}"]`)) periode = memo;
+} catch {}
 function filtrer() {
-  if (!mois || !dernier) return H;
-  const limite = jour(dernier.date); limite.setMonth(limite.getMonth() - mois);
+  const m = /^(\d+)([sm])$/.exec(periode);
+  if (!m || !dernier) return H;
+  const limite = jour(dernier.date), n = Number(m[1]);
+  if (m[2] === "s") limite.setDate(limite.getDate() - 7 * n);
+  else limite.setMonth(limite.getMonth() - n);
   const iso = limite.toISOString().slice(0, 10);
   return H.filter(r => r.date >= iso);
 }
@@ -502,13 +511,13 @@ function dessinerEvolution() {
   ] });
 }
 const boutons = document.querySelectorAll("#periodes button");
-function choisirPeriode(m) {
-  mois = m;
-  boutons.forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.mois) === m)));
-  try { localStorage.setItem("pea-periode", String(m)); } catch {}
+function choisirPeriode(p) {
+  periode = p;
+  boutons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.periode === p)));
+  try { localStorage.setItem("pea-periode", p); } catch {}
   dessinerEvolution();
 }
-boutons.forEach(b => b.addEventListener("click", () => choisirPeriode(Number(b.dataset.mois))));
+boutons.forEach(b => b.addEventListener("click", () => choisirPeriode(b.dataset.periode)));
 
 function dessinerBarres() {
   const detailsPosition = p => [
@@ -586,7 +595,7 @@ tableau(document.getElementById("t-transactions"), [
 ], D.transactions, { cle: "date_execution", sens: -1 });
 
 // Rendu initial, puis au redimensionnement et au changement de thème
-choisirPeriode(mois);
+choisirPeriode(periode);
 dessinerBarres();
 let attente;
 new ResizeObserver(() => { clearTimeout(attente); attente = setTimeout(dessinerEvolution, 80); })
