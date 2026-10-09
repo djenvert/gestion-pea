@@ -151,6 +151,11 @@ def donnees(con: sqlite3.Connection, reference: date) -> dict | None:
             break
         serie += 1
     total = gain(fin)
+    # Portefeuille témoin en ETF S&P 500 (mêmes montants) : absent tant que ses cours manquent
+    etf_total = fin["plus_value_etf"]
+    etf_veille = veille["plus_value_etf"] if veille else 0.0
+    etf_semaine = etf_total - etf_veille if etf_total is not None and etf_veille is not None else None
+    base_etf = ((veille["valorisation_etf"] or 0) if veille else 0) + max(flux, 0)
 
     a, s, _ = lundi.isocalendar()
     return {
@@ -165,12 +170,18 @@ def donnees(con: sqlite3.Connection, reference: date) -> dict | None:
         "versements": flux,
         "total_euros": total,
         "total_pct": 100 * total / fin["montant_investi"] if fin["montant_investi"] else None,
+        "etf_total_euros": etf_total,
+        "etf_total_pct": 100 * etf_total / fin["montant_investi"]
+                         if etf_total is not None and fin["montant_investi"] else None,
+        "etf_semaine_euros": etf_semaine,
+        "etf_semaine_pct": 100 * etf_semaine / base_etf if etf_semaine is not None and base_etf > 0 else None,
         "record": total > 0 and all(gain(r) < total for r in historique if r["date"] < fin["date"]),
         "serie": serie,
         "jours": jours,
         "lignes": lignes,
         "historique": [{"date": r["date"], "valorisation": r["valorisation"],
-                        "investi": r["montant_investi"]} for r in historique if r["date"] <= fin["date"]],
+                        "investi": r["montant_investi"],
+                        "etf": r["valorisation_etf"]} for r in historique if r["date"] <= fin["date"]],
         "lundi": lundi.isoformat(),
         "exemple": False,
     }

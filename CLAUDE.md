@@ -17,7 +17,7 @@ python3 pea.py bilan [AAAA-MM-JJ]   # cours (sans date) puis bilans/bilan_AAAA-S
 python3 pea.py planifier-bilan vendredi 19:00   # (ré)installe l'agent launchd du bilan ; « aucun » le retire
 python3 exemple.py          # tableau_exemple.html + bilan_exemple.png : données fictives (graine fixe), publiables
 
-python3 -m unittest tests/test_parser.py tests/test_anonymat.py tests/test_bilan.py   # tous les tests
+python3 -m unittest tests/test_parser.py tests/test_anonymat.py tests/test_bilan.py tests/test_etf.py   # tous les tests
 python3 -m unittest tests.test_parser.TestParser.test_achat_bourse_etrangere    # un test
 
 pdftotext -layout fichier.pdf -   # inspecter la mise en page d'un nouvel avis avant d'adapter le parseur
@@ -43,6 +43,7 @@ Flux : `parser_avis.lire()` → `db.inserer()` → `db.recalculer_valeurs()` + `
 - `transactions` est la seule source de vérité. `valeurs` (positions, PRU) et `historique` (valorisation quotidienne) sont supprimées puis reconstruites intégralement à chaque passage, dans l'ordre chronologique : ne jamais les modifier à la main. L'ordre de dépôt des avis est donc indifférent.
 - Le PRU est un coût moyen pondéré, frais inclus (`montant_net` = brut + courtages + commission + frais). La logique est centralisée dans `db.appliquer()`, réutilisée par `recalculer_valeurs`, `recalculer_historique` et `tableau.situations()` (position après chaque transaction, pour le texte « Partager »). Une vente laisse le PRU inchangé et cumule la plus-value réalisée.
 - `historique` valorise chaque titre à sa dernière clôture connue (les places ont des jours fériés différents), ou à son coût s'il n'a encore aucun cours.
+- Portefeuille témoin : chaque transaction est répliquée sur l'ETF `db.ETF` (Amundi PEA S&P 500, `PSP5.PA`) par `db.appliquer_etf()`, pour le même montant net : commission `ETF_TAUX` (0,50 %) comprise, parts fractionnaires, clôture du jour. Rien n'est écrit dans `transactions` : seules `historique.valorisation_etf` et `plus_value_etf` (gain total = valorisation − apports nets) sont calculées, et `pea.py cours` récupère les cours de l'ETF en plus. Une vente plus grosse que le témoin vend tout et avertit dans le log. À comparer au gain total du PEA (latente + réalisée).
 - `v_positions` (vue SQL) joint les positions au dernier cours.
 - `tickers` associe un ISIN à un symbole Yahoo et à un secteur. La table est remplie automatiquement, mais un symbole corrigé à la main est conservé.
 - Les migrations de schéma sont faites à la main dans `db.connecter()` (`ALTER TABLE` si une colonne manque). Ajouter une colonne demande de la déclarer à la fois dans `SCHEMA` et dans cette migration.
@@ -58,7 +59,7 @@ Flux : `parser_avis.lire()` → `db.inserer()` → `db.recalculer_valeurs()` + `
 
 ### Bilan de la semaine (`bilan.py`)
 
-`bilan.donnees()` calcule la semaine ISO de la date de référence (ou la dernière semaine cotée) depuis `historique`, `transactions` et `cours`. `bilan.rendre()` injecte le JSON dans `bilan_modele.html` (1600 × 900) et capture la page en PNG ×2 avec Chrome headless. Ne pas passer `--user-data-dir` à Chrome : il bloque alors indéfiniment. Performance de la semaine = Δ(plus-value latente + réalisée), donc hors versements. Le bilan utilise vert = hausse et rouge = baisse (demande explicite), toujours doublés d'un signe et d'une flèche. Les tests (`tests/test_bilan.py`) utilisent la base fictive `exemple.base()`.
+`bilan.donnees()` calcule la semaine ISO de la date de référence (ou la dernière semaine cotée) depuis `historique`, `transactions` et `cours`. `bilan.rendre()` injecte le JSON dans `bilan_modele.html` (1600 × 900) et capture la page en PNG ×2 avec Chrome headless. Ne pas passer `--user-data-dir` à Chrome : il bloque alors indéfiniment. Performance de la semaine = Δ(plus-value latente + réalisée), donc hors versements. La ligne « Face au S&P 500 » compare le gain total à `historique.plus_value_etf`. Le bilan utilise vert = hausse et rouge = baisse (demande explicite), toujours doublés d'un signe et d'une flèche. Les tests (`tests/test_bilan.py`) utilisent la base fictive `exemple.base()`.
 
 ### Tableau de bord
 

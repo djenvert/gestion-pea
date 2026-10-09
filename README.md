@@ -15,8 +15,9 @@ On dépose un avis dans `inbox/` : il est lu, vérifié puis enregistré dans un
 - **PRU frais inclus** : coût moyen pondéré, courtages, commissions et frais compris. Une vente laisse le PRU inchangé et cumule la plus-value réalisée.
 - **Cours quotidiens** : clôtures récupérées sur Yahoo Finance. Le symbole et le secteur sont trouvés automatiquement à partir de l'ISIN.
 - **Historique de valorisation** reconstruit jour par jour depuis les transactions.
+- **Comparaison avec le S&P 500** : chaque achat ou vente est répliqué, pour le même montant net, sur un ETF S&P 500 éligible au PEA (Amundi PEA S&P 500, FR0011871128), commission de 0,50 % comprise et en parts fractionnaires. Le tableau de bord compare le gain total du PEA à celui de ce portefeuille témoin.
 - **Tableau de bord** (`tableau.html`) : valorisation et montant investi, plus-value latente, performance et poids par ligne, répartition par secteur et par pays, positions, transactions, avec un bouton « Partager » qui copie le résumé d'une opération. Le fichier fonctionne hors ligne, gère le mode sombre et propose une version tableau de chaque graphique.
-- **Bilan de la semaine** (`bilans/bilan_AAAA-Sss.png`) : une image à partager avec la valorisation, la performance de la semaine et depuis le début (hors versements), le top et le flop, la semaine jour par jour, le nombre de lignes en hausse et en baisse, et les faits marquants (record de plus-value, série de semaines positives). Le bilan est généré chaque semaine au jour et à l'heure choisis, avec une notification macOS.
+- **Bilan de la semaine** (`bilans/bilan_AAAA-Sss.png`) : une image à partager avec la valorisation, la performance de la semaine et depuis le début (hors versements), le top et le flop, la semaine jour par jour, l'écart avec un ETF S&P 500 acheté aux mêmes montants, le nombre de lignes en hausse et en baisse, et les faits marquants (record de plus-value, série de semaines positives). Le bilan est généré chaque semaine au jour et à l'heure choisis, avec une notification macOS.
 - **Automatisation macOS** avec launchd : import dès qu'un fichier arrive dans `inbox/`, mise à jour des cours en semaine à 18h30.
 
 ## Bilan de la semaine
@@ -127,7 +128,7 @@ La table `transactions` est la seule source de vérité. Les tables `valeurs` (p
 ## Tests
 
 ```sh
-python3 -m unittest tests/test_parser.py tests/test_anonymat.py tests/test_bilan.py
+python3 -m unittest tests/test_parser.py tests/test_anonymat.py tests/test_bilan.py tests/test_etf.py
 ```
 
 Les tests utilisent une base SQLite en mémoire et ne touchent jamais `pea.db`.

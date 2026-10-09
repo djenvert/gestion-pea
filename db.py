@@ -1,9 +1,17 @@
 """Base SQLite du PEA : transactions et agrégat par valeur (PRU frais inclus)."""
 
+import bisect
+import logging
 import sqlite3
 from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
+
+# Portefeuille témoin : chaque achat ou vente est répliqué, pour le même montant net, sur cet ETF
+ETF = {"isin": "FR0011871128", "symbole": "PSP5.PA", "libelle": "Amundi PEA S&P 500"}
+ETF_TAUX = Decimal("0.005")  # commission proportionnelle (taux constaté sur les avis à Paris)
+
+log = logging.getLogger("pea")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS transactions (
@@ -64,7 +72,9 @@ CREATE TABLE IF NOT EXISTS historique (
   montant_investi REAL NOT NULL,       -- coût de revient des titres détenus
   valorisation REAL NOT NULL,          -- Σ quantité × dernière clôture connue
   plus_value_latente REAL NOT NULL,
-  plus_value_realisee REAL NOT NULL    -- cumulée depuis le début
+  plus_value_realisee REAL NOT NULL,   -- cumulée depuis le début
+  valorisation_etf REAL,               -- portefeuille témoin en ETF S&P 500 (NULL sans cours)
+  plus_value_etf REAL                  -- gain total du témoin : valorisation - apports nets
 );
 
 -- Positions actuelles valorisées au dernier cours connu
@@ -98,6 +108,10 @@ def connecter(chemin: Path) -> sqlite3.Connection:
     colonnes = {r["name"] for r in con.execute("PRAGMA table_info(transactions)")}
     if "provisoire" not in colonnes:
         con.execute("ALTER TABLE transactions ADD COLUMN provisoire INTEGER NOT NULL DEFAULT 0")
+    colonnes = {r["name"] for r in con.execute("PRAGMA table_info(historique)")}
+    for colonne in ("valorisation_etf", "plus_value_etf"):
+        if colonne not in colonnes:
+            con.execute(f"ALTER TABLE historique ADD COLUMN {colonne} REAL")
     return con
 
 
@@ -137,6 +151,28 @@ def appliquer(etat: dict, t) -> dict:
         e["cout"] -= pru * q
         e["qte"] -= q
     return e
+
+
+def appliquer_etf(etat: dict, t, cours: Decimal) -> str | None:
+    """Réplique la transaction `t` sur le portefeuille témoin (parts fractionnaires d'ETF).
+
+    Achat : le même montant net est dépensé, commission comprise. Vente : on vend de quoi
+    encaisser le même net, commission déduite, dans la limite des parts détenues.
+    `apports` = sommes versées moins sommes encaissées. Renvoie un avertissement éventuel.
+    """
+    net = Decimal(str(t["montant_net"]))
+    if t["sens"] == "ACHAT":
+        etat["parts"] += net / (1 + ETF_TAUX) / cours
+        etat["apports"] += net
+        return None
+    parts, alerte = net / (1 - ETF_TAUX) / cours, None
+    if parts > etat["parts"]:
+        alerte = (f"vente de {t['libelle']} du {t['date_execution'][:10]} ({net} €) : le témoin "
+                  f"ETF ne vaut que {etat['parts'] * cours * (1 - ETF_TAUX):.2f} €, tout est vendu")
+        parts = etat["parts"]
+    etat["parts"] -= parts
+    etat["apports"] -= parts * cours * (1 - ETF_TAUX)
+    return alerte
 
 
 def recalculer_valeurs(con: sqlite3.Connection) -> list[str]:
@@ -189,14 +225,29 @@ def recalculer_historique(con: sqlite3.Connection) -> int:
     cours = defaultdict(dict)
     for r in con.execute("SELECT isin, date, cloture FROM cours ORDER BY date"):
         cours[r["date"]][r["isin"]] = Decimal(str(r["cloture"]))
+    # Témoin ETF : chaque transaction au cours de clôture de son jour (à défaut, le plus proche
+    # avant, ou le premier après)
+    dates_etf = [d for d in sorted(cours) if ETF["isin"] in cours[d]]
 
-    etat, dernier_cours, i = {}, {}, 0
+    def cours_etf(jour: str) -> Decimal:
+        k = bisect.bisect_right(dates_etf, jour)
+        return cours[dates_etf[k - 1 if k else 0]][ETF["isin"]]
+
+    etat, etf, dernier_cours, i = {}, {"parts": Decimal(0), "apports": Decimal(0)}, {}, 0
     con.execute("DELETE FROM historique")
     for d in dates:
         while i < len(transactions) and transactions[i]["date_execution"][:10] <= d:
-            appliquer(etat, transactions[i])
+            t = transactions[i]
+            appliquer(etat, t)
+            if dates_etf and (alerte := appliquer_etf(etf, t, cours_etf(t["date_execution"][:10]))):
+                log.warning("Témoin ETF : %s", alerte)
             i += 1
         dernier_cours.update(cours[d])
+        valo_etf = pv_etf = None
+        if ETF["isin"] in dernier_cours:
+            valo_etf = etf["parts"] * dernier_cours[ETF["isin"]]
+            pv_etf = float(round(valo_etf - etf["apports"], 2))
+            valo_etf = float(round(valo_etf, 2))
         investi = valorisation = pv_realisee = Decimal(0)
         for isin, e in etat.items():
             pv_realisee += e["pv"]
@@ -205,8 +256,9 @@ def recalculer_historique(con: sqlite3.Connection) -> int:
             investi += e["cout"]
             valorisation += e["qte"] * dernier_cours[isin] if isin in dernier_cours else e["cout"]
         con.execute(
-            "INSERT INTO historique VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO historique VALUES (?, ?, ?, ?, ?, ?, ?)",
             (d, float(round(investi, 2)), float(round(valorisation, 2)),
-             float(round(valorisation - investi, 2)), float(round(pv_realisee, 2))),
+             float(round(valorisation - investi, 2)), float(round(pv_realisee, 2)),
+             valo_etf, pv_etf),
         )
     return len(dates)

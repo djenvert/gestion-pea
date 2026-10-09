@@ -14,6 +14,7 @@
   --border: rgba(17,17,16,0.09);
   --serie: #2a78d6;
   --contexte: #9a998f;
+  --etf: #b8650a;            /* portefeuille témoin ETF S&P 500 */
   --bande: rgba(42,120,214,0.08);
   /* Hausse en vert, baisse en rouge : toujours doublés d'un signe et d'une flèche */
   --hausse: #137a36; --hausse-fond: #e8f5ec; --hausse-bord: #bfe3c9; --hausse-barre: #2e9e55;
@@ -42,8 +43,8 @@ header { display: flex; justify-content: space-between; align-items: flex-end; }
 .carte { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px 26px; }
 .carte h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 650; }
 
-.valeur { font-size: 64px; font-weight: 750; letter-spacing: -0.03em; line-height: 1.05; margin: 4px 0 18px; }
-.tendances { display: grid; gap: 12px; }
+.valeur { font-size: 64px; font-weight: 750; letter-spacing: -0.03em; line-height: 1.05; margin: 2px 0 14px; }
+.tendances { display: grid; gap: 10px; }
 .tendance { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .tendance .libelle { color: var(--ink-2); font-size: 15px; }
 .pastille { display: inline-flex; gap: 10px; align-items: baseline; padding: 6px 12px; border-radius: 9px;
@@ -52,7 +53,7 @@ header { display: flex; justify-content: space-between; align-items: flex-end; }
 .hausse { color: var(--hausse); background: var(--hausse-fond); border-color: var(--hausse-bord); }
 .baisse { color: var(--baisse); background: var(--baisse-fond); border-color: var(--baisse-bord); }
 .neutre { color: var(--ink-2); background: var(--page); border-color: var(--border); }
-.note { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+.note { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
 
 .duel { flex: 1; display: grid; gap: 12px; align-content: start; }
 .case { border: 1px solid; border-radius: 12px; padding: 12px 16px; display: grid;
@@ -67,6 +68,7 @@ header { display: flex; justify-content: space-between; align-items: flex-end; }
 .legende { display: flex; gap: 18px; color: var(--ink-2); font-size: 14px; margin: -4px 0 6px; }
 .legende span::before { content: ""; display: inline-block; width: 16px; height: 3px; border-radius: 2px;
                         background: var(--c); vertical-align: middle; margin-right: 6px; }
+.legende span.tirets::before { background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 8px); }
 .graphe svg { flex: 1; width: 100%; min-height: 0; }
 svg text { font: 13px -apple-system, system-ui, sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -123,7 +125,7 @@ footer { display: flex; justify-content: space-between; color: var(--muted); fon
   <div class="colonne">
     <section class="carte graphe">
       <h2>Évolution du portefeuille</h2>
-      <div class="legende"><span style="--c: var(--serie)">Valorisation</span><span style="--c: var(--contexte)">Montant investi</span></div>
+      <div class="legende"><span style="--c: var(--serie)">Valorisation</span><span class="tirets" style="--c: var(--contexte)">Montant investi</span></div>
       <svg id="courbe" preserveAspectRatio="none"></svg>
     </section>
     <div class="bas">
@@ -186,11 +188,28 @@ for (const [libelle, p, e] of [["Sur la semaine", D.semaine_pct, D.semaine_euros
   const pastille = el("span", { class: `pastille num ${sens(e)}` }, ligne, fleche(e) + pourcent(p));
   el("small", {}, pastille, euros(e));
 }
-if (Math.abs(D.versements) >= 1) {
-  document.getElementById("versements").textContent = D.versements > 0
-    ? `${eur0.format(D.versements)} investis cette semaine, non comptés dans la performance.`
-    : `${eur0.format(-D.versements)} retirés cette semaine (ventes), non comptés dans la performance.`;
+// Face au S&P 500 : écart de performance depuis le début avec le témoin ETF (mêmes montants)
+const avecETF = D.etf_total_euros != null;
+if (avecETF) {
+  const ecart = D.total_euros - D.etf_total_euros;
+  const ligne = el("div", { class: "tendance" }, tendances);
+  el("span", { class: "libelle" }, ligne, "Face au S&P 500");
+  const pastille = el("span", { class: `pastille num ${sens(ecart)}` }, ligne,
+                      fleche(ecart) + `${signe(ecart)}${pct2.format(Math.abs(D.total_pct - D.etf_total_pct))} pts`);
+  el("small", {}, pastille, euros(ecart));
 }
+if (D.historique.every(r => r.etf != null)) {
+  el("span", { class: "tirets", style: "--c: var(--etf)" }, document.querySelector(".legende"), "Mêmes montants en ETF S&P 500");
+}
+const notes = [];
+if (avecETF) notes.push(`ETF S&P 500 : ${pourcent(D.etf_total_pct)} depuis le début`
+                        + (D.etf_semaine_pct != null ? `, ${pourcent(D.etf_semaine_pct)} sur la semaine.` : "."));
+if (Math.abs(D.versements) >= 1) {
+  notes.push(D.versements > 0
+    ? `${eur0.format(D.versements)} investis cette semaine, non comptés dans la performance.`
+    : `${eur0.format(-D.versements)} retirés cette semaine (ventes), non comptés dans la performance.`);
+}
+document.getElementById("versements").textContent = notes.join(" ");
 
 // Top et flop
 const duel = document.getElementById("duel");
@@ -211,7 +230,7 @@ for (const [etiquette, l] of [["Top de la semaine", meilleure], ["Flop de la sem
   const { width: W, height: H } = svg.getBoundingClientRect();
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   const h = D.historique, g = 64, d = 8, hautM = 8, basM = 26;
-  const valeurs = h.flatMap(r => [r.valorisation, r.investi]);
+  const valeurs = h.flatMap(r => [r.valorisation, r.investi, r.etf ?? r.valorisation]);
   let min = Math.min(...valeurs), max = Math.max(...valeurs);
   const marge = (max - min) * 0.08 || max * 0.05 || 1; min -= marge; max += marge;
   const pas = Math.pow(10, Math.floor(Math.log10((max - min) / 4)));
@@ -241,6 +260,8 @@ for (const [etiquette, l] of [["Top de la semaine", meilleure], ["Flop de la sem
   const chemin = f => h.map((r, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(f(r)).toFixed(1)}`).join("");
   el("svg:path", { d: `${chemin(r => r.valorisation)}L${X(h.length - 1)},${H - basM}L${X(0)},${H - basM}Z`, fill: "rgba(42,120,214,0.07)" }, svg);
   el("svg:path", { d: chemin(r => r.investi), fill: "none", stroke: "var(--contexte)", "stroke-width": 2, "stroke-dasharray": "6 5" }, svg);
+  if (h.every(r => r.etf != null))
+    el("svg:path", { d: chemin(r => r.etf), fill: "none", stroke: "var(--etf)", "stroke-width": 2.5, "stroke-dasharray": "8 5", "stroke-linejoin": "round" }, svg);
   el("svg:path", { d: chemin(r => r.valorisation), fill: "none", stroke: "var(--serie)", "stroke-width": 3, "stroke-linejoin": "round" }, svg);
   const n = h.length - 1;
   el("svg:circle", { cx: X(n), cy: Y(h[n].valorisation), r: 6, fill: "var(--serie)", stroke: "#fff", "stroke-width": 2.5 }, svg);
@@ -279,6 +300,7 @@ for (const [etiquette, l] of [["Top de la semaine", meilleure], ["Flop de la sem
   if (D.record) faits.push("🏆 Plus-value record");
   if (D.serie >= 2) faits.push(`${D.semaine_euros > 0 ? "🔥" : "🧊"} ${D.serie}ᵉ semaine de ${D.semaine_euros > 0 ? "hausse" : "baisse"} d'affilée`);
   const meilleur = [...D.jours].sort((a, b) => b.gain - a.gain)[0];
+  if (D.etf_semaine_euros != null && D.semaine_euros > D.etf_semaine_euros) faits.push("💪 Mieux que le S&P 500 cette semaine");
   if (meilleur && meilleur.gain > 0) faits.push(`Meilleure séance : ${new Date(meilleur.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long" })}`);
   const ecart = D.lignes.length > 1 ? D.lignes[0].pct - D.lignes[D.lignes.length - 1].pct : 0;
   if (ecart) faits.push(`Écart top / flop : ${pct2.format(ecart)} pts`);

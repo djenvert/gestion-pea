@@ -51,6 +51,7 @@ def donnees(con: sqlite3.Connection) -> dict:
         "historique": lignes("SELECT * FROM historique ORDER BY date"),
         "positions": positions,
         "transactions": transactions,
+        "etf": dict(db.ETF, taux=float(db.ETF_TAUX)),
         "frais": con.execute(
             "SELECT coalesce(sum(courtages + commission + frais), 0) FROM transactions").fetchone()[0],
     }

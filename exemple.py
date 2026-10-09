@@ -131,6 +131,11 @@ def base() -> sqlite3.Connection:
                     (isin, symbole, lieu or "EURONEXT PARIS", secteur))
         con.executemany("INSERT INTO cours (isin, date, cloture) VALUES (?, ?, ?)",
                         [(isin, d, c) for d, c in cours[isin].items()])
+    # ETF du portefeuille témoin : générateur à part, pour ne pas changer les autres séries
+    etf, c = random.Random(500), 52.0
+    con.executemany("INSERT INTO cours (isin, date, cloture) VALUES (?, ?, ?)",
+                    [(db.ETF["isin"], d.isoformat(), round(c := c * (1 + etf.gauss(0.0005, 0.009)), 2))
+                     for d in jours_ouvres()])
     for n, (jour, isin, sens, montant) in enumerate(OPERATIONS):
         a = avis(n, jour, isin, sens, montant, cours)
         if a["provisoire"]:  # commission encore inconnue

@@ -130,6 +130,14 @@ def cours() -> int:
         "FROM transactions t LEFT JOIN tickers k ON k.isin = t.isin "
         "GROUP BY t.isin ORDER BY t.libelle"
     ).fetchall()
+    # ETF du portefeuille témoin : symbole connu, cours depuis la première transaction
+    etf = con.execute(
+        "SELECT :isin AS isin, :libelle AS libelle, min(substr(date_execution, 1, 10)) AS premier_achat, "
+        ":symbole AS symbole, 'ETF' AS secteur, "
+        "(SELECT max(date) FROM cours WHERE isin = :isin) AS dernier_cours FROM transactions",
+        db.ETF).fetchone()
+    if etf["premier_achat"]:
+        lignes.append(etf)
     for v in lignes:
         try:
             symbole = v["symbole"]
@@ -165,6 +173,10 @@ def cours() -> int:
                  "plus-value latente %+.2f € (%+.2f %%)", nb, dernier["date"],
                  dernier["valorisation"], dernier["montant_investi"], dernier["plus_value_latente"],
                  100 * dernier["plus_value_latente"] / dernier["montant_investi"])
+        if dernier["plus_value_etf"] is not None:
+            gain = dernier["plus_value_latente"] + dernier["plus_value_realisee"]
+            log.info("Témoin %s : gain %+.2f €, contre %+.2f € pour le PEA (écart %+.2f €)",
+                     db.ETF["libelle"], dernier["plus_value_etf"], gain, gain - dernier["plus_value_etf"])
     tableau()
     return 1 if echecs else 0
 

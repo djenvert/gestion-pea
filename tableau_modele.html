@@ -20,6 +20,7 @@
   --gain: #2a78d6;           /* pôle bleu du divergent */
   --perte: #e34948;          /* pôle rouge du divergent */
   --contexte: #898781;       /* montant investi (série de contexte) */
+  --etf: #b8650a;            /* portefeuille témoin ETF S&P 500 (tirets) */
   --texte-gain: #006300;
   --texte-perte: #b42323;
 }
@@ -28,7 +29,7 @@
     color-scheme: dark;
     --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
-    --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781;
+    --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781; --etf: #e0a040;
     --texte-gain: #0ca30c; --texte-perte: #e66767;
   }
 }
@@ -36,7 +37,7 @@
   color-scheme: dark;
   --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
-  --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781;
+  --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781; --etf: #e0a040;
   --texte-gain: #0ca30c; --texte-perte: #e66767;
 }
 
@@ -84,6 +85,7 @@ h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
 .legende { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); margin: 6px 0 4px; }
 .legende span { display: inline-flex; align-items: center; gap: 6px; }
 .cle-ligne { width: 16px; height: 2px; border-radius: 1px; display: inline-block; }
+.cle-tirets { background: repeating-linear-gradient(90deg, var(--etf) 0 5px, transparent 5px 8px) !important; }
 .cle-rect { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
 /* Graphique en ligne */
@@ -174,6 +176,20 @@ td .isin { color: var(--muted); font-size: 11px; display: block; }
     <details>
       <summary>Voir les données jour par jour</summary>
       <div class="defile"><table id="t-historique"></table></div>
+    </details>
+  </section>
+
+  <section class="carte" id="c-etf" hidden>
+    <h2>Comparaison avec le S&amp;P 500</h2>
+    <p class="note" id="note-etf"></p>
+    <div class="legende">
+      <span><i class="cle-ligne" style="background:var(--serie)"></i>Mon PEA</span>
+      <span><i class="cle-ligne cle-tirets"></i>Même montant en ETF S&amp;P 500</span>
+    </div>
+    <div class="graphe" id="g-etf"></div>
+    <details>
+      <summary>Voir les données jour par jour</summary>
+      <div class="defile"><table id="t-etf"></table></div>
     </details>
   </section>
 
@@ -309,7 +325,8 @@ function grapheLigne(conteneur, { lignes, series, signe: avecSigne = false, haut
     for (const [couleur, clip] of traces) {
       const g = el("svg:g", clip ? { "clip-path": `url(#${uid}${clip})` } : {}, svg);
       if (s.aire) el("svg:path", { d: aire, fill: css(couleur), "fill-opacity": 0.1 }, g);
-      el("svg:path", { d, fill: "none", stroke: css(couleur), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, g);
+      el("svg:path", { d, fill: "none", stroke: css(couleur), "stroke-width": 2, "stroke-linejoin": "round",
+                       "stroke-linecap": s.tirets ? "butt" : "round", ...(s.tirets ? { "stroke-dasharray": "6 4" } : {}) }, g);
     }
   }
 
@@ -455,6 +472,10 @@ async function partager(bouton, t) {
 const H = D.historique, P = D.positions;
 const dernier = H[H.length - 1], veille = H[H.length - 2];
 const totalValo = P.reduce((s, p) => s + (p.valorisation ?? p.montant_investi), 0);
+// Gain total (latente + réalisée), comparable à celui du témoin ETF ; apports = versé - encaissé
+const gainPEA = r => r.plus_value_latente + r.plus_value_realisee;
+const apports = r => r.montant_investi - r.plus_value_realisee;
+const avecETF = r => r.plus_value_etf != null;
 
 document.getElementById("sous-titre").textContent = (D.exemple ? "Exemple avec des données fictives · " : "")
   + (dernier ? `Cours de clôture du ${dateLongue(dernier.date)} · mis à jour le ${D.genere_le}`
@@ -477,6 +498,11 @@ document.getElementById("sous-titre").textContent = (D.exemple ? "Exemple avec d
     const v = dernier.plus_value_latente - veille.plus_value_latente;
     const base = veille.valorisation + (dernier.montant_investi - veille.montant_investi);
     tuile("Dernière séance", signe(v, eur), { v, texte: signe(v / base, pct) });
+  }
+  if (avecETF(dernier)) {
+    const g = gainPEA(dernier), e = g - dernier.plus_value_etf, a = apports(dernier);
+    tuile("Écart vs S&P 500", signe(e, eur),
+          { v: e, texte: `PEA ${signe(g / a, pct)} · ETF ${signe(dernier.plus_value_etf / a, pct)}` });
   }
   tuile("Montant investi", eur0.format(dernier.montant_investi), { v: 0, texte: `${P.length} lignes` });
   tuile("Plus-value réalisée", signe(dernier.plus_value_realisee, eur), { v: 0, texte: "ventes cumulées" });
@@ -508,6 +534,10 @@ function dessinerEvolution() {
   ] });
   grapheLigne(document.getElementById("g-plus-value"), { lignes, signe: true, hauteur: 220, series: [
     { nom: "Plus-value latente", valeur: r => r.plus_value_latente, aire: true },
+  ] });
+  if (HE.length) grapheLigne(document.getElementById("g-etf"), { lignes: lignes.filter(avecETF), hauteur: 220, series: [
+    { nom: "Gain du PEA", valeur: gainPEA, couleur: "--serie" },
+    { nom: "Gain de l'ETF S&P 500", valeur: r => r.plus_value_etf, couleur: "--etf", tirets: true },
   ] });
 }
 const boutons = document.querySelectorAll("#periodes button");
@@ -573,6 +603,22 @@ tableau(document.getElementById("t-historique"), [
   { cle: "plus_value_latente", titre: "+/− value latente", n: true, rendu: (td, r) => cellulePV(eur)(td, r.plus_value_latente) },
   { cle: "plus_value_realisee", titre: "+/− value réalisée", n: true, rendu: (td, r) => cellulePV(eur)(td, r.plus_value_realisee) },
 ], H, { cle: "date", sens: -1 });
+
+// Portefeuille témoin : n'apparaît qu'une fois les cours de l'ETF récupérés
+const HE = H.filter(avecETF);
+if (HE.length) {
+  document.getElementById("c-etf").hidden = false;
+  document.getElementById("note-etf").textContent = `Chaque achat ou vente est répliqué, pour le même montant net, `
+    + `sur l'ETF ${D.etf.libelle} (${D.etf.isin}) : commission de ${pct.format(D.etf.taux)} comprise, parts fractionnaires, `
+    + `cours de clôture du jour. Gain = plus-value latente + réalisée ; les dividendes des actions ne sont pas encore comptés.`;
+  tableau(document.getElementById("t-etf"), [
+    { cle: "date", titre: "Date", format: v => dateLongue(v) },
+    { cle: "gain", titre: "Gain du PEA", n: true, tri: gainPEA, rendu: (td, r) => cellulePV(eur)(td, gainPEA(r)) },
+    { cle: "plus_value_etf", titre: "Gain de l'ETF", n: true, rendu: (td, r) => cellulePV(eur)(td, r.plus_value_etf) },
+    { cle: "ecart", titre: "Écart", n: true, tri: r => gainPEA(r) - r.plus_value_etf, rendu: (td, r) => cellulePV(eur)(td, gainPEA(r) - r.plus_value_etf) },
+    { cle: "valorisation_etf", titre: "Valorisation ETF", n: true, format: v => eur.format(v) },
+  ], HE, { cle: "date", sens: -1 });
+}
 
 document.getElementById("resume-transactions").textContent = `Voir les ${D.transactions.length} opérations`;
 tableau(document.getElementById("t-transactions"), [
