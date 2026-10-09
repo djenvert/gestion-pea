@@ -52,6 +52,9 @@ def donnees(con: sqlite3.Connection) -> dict:
         "positions": positions,
         "transactions": transactions,
         "etf": dict(db.ETF, taux=float(db.ETF_TAUX)),
+        "frais_etf": con.execute(
+            "SELECT frais_etf FROM historique ORDER BY date DESC LIMIT 1").fetchone()[0]
+            if con.execute("SELECT 1 FROM historique LIMIT 1").fetchone() else None,
         "frais": con.execute(
             "SELECT coalesce(sum(courtages + commission + frais), 0) FROM transactions").fetchone()[0],
     }

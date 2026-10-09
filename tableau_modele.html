@@ -506,7 +506,8 @@ document.getElementById("sous-titre").textContent = (D.exemple ? "Exemple avec d
   }
   tuile("Montant investi", eur0.format(dernier.montant_investi), { v: 0, texte: `${P.length} lignes` });
   tuile("Plus-value réalisée", signe(dernier.plus_value_realisee, eur), { v: 0, texte: "ventes cumulées" });
-  tuile("Frais payés", eur.format(D.frais), { v: 0, texte: `${D.transactions.length} opérations` });
+  tuile("Frais payés", eur.format(D.frais), { v: 0, texte: `${D.transactions.length} opérations`
+        + (D.frais_etf != null ? ` · ETF : ${eur0.format(D.frais_etf)}` : "") });
 })();
 
 // Période (mémorisée localement si possible) : "1s" = 1 semaine, "3m" = 3 mois, "tout"

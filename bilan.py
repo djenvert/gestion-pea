@@ -134,6 +134,11 @@ def donnees(con: sqlite3.Connection, reference: date) -> dict | None:
         "SELECT coalesce(sum(CASE sens WHEN 'ACHAT' THEN montant_net ELSE -montant_net END), 0) "
         "FROM transactions WHERE substr(date_execution, 1, 10) BETWEEN ? AND ?",
         (lundi.isoformat(), fin["date"])).fetchone()[0]
+    frais = con.execute(
+        "SELECT coalesce(sum(CASE WHEN substr(date_execution, 1, 10) >= ? "
+        "THEN courtages + commission + frais END), 0), coalesce(sum(courtages + commission + frais), 0) "
+        "FROM transactions WHERE substr(date_execution, 1, 10) <= ?",
+        (lundi.isoformat(), fin["date"])).fetchone()
     gain_semaine = gain(fin) - gain(veille)
     base = (veille["valorisation"] if veille else 0) + max(flux, 0)
 
@@ -175,6 +180,9 @@ def donnees(con: sqlite3.Connection, reference: date) -> dict | None:
                          if etf_total is not None and fin["montant_investi"] else None,
         "etf_semaine_euros": etf_semaine,
         "etf_semaine_pct": 100 * etf_semaine / base_etf if etf_semaine is not None and base_etf > 0 else None,
+        "frais_semaine": frais[0],
+        "frais_total": frais[1],
+        "frais_etf_total": fin["frais_etf"],
         "record": total > 0 and all(gain(r) < total for r in historique if r["date"] < fin["date"]),
         "serie": serie,
         "jours": jours,

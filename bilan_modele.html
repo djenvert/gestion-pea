@@ -86,8 +86,8 @@ svg text { font: 13px -apple-system, system-ui, sans-serif; fill: var(--muted); 
 .barometre .split { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin: 6px 0 10px; background: var(--grid); }
 .barometre .split div { height: 100%; }
 .barometre .compte { display: flex; justify-content: space-between; font-size: 15px; font-weight: 600; }
-.badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.badge { padding: 5px 11px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--page); border: 1px solid var(--border); color: var(--ink-2); }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.badge { padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--page); border: 1px solid var(--border); color: var(--ink-2); }
 
 footer { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; margin-top: -6px; }
 </style>
@@ -204,12 +204,15 @@ if (D.historique.every(r => r.etf != null)) {
 const notes = [];
 if (avecETF) notes.push(`ETF S&P 500 : ${pourcent(D.etf_total_pct)} depuis le début`
                         + (D.etf_semaine_pct != null ? `, ${pourcent(D.etf_semaine_pct)} sur la semaine.` : "."));
+notes.push(`Frais : ${eur0.format(D.frais_semaine)} cette semaine, ${eur0.format(D.frais_total)} depuis le début`
+           + (D.frais_etf_total != null ? ` (${eur0.format(D.frais_etf_total)} pour l'ETF).` : "."));
 if (Math.abs(D.versements) >= 1) {
   notes.push(D.versements > 0
     ? `${eur0.format(D.versements)} investis cette semaine, non comptés dans la performance.`
     : `${eur0.format(-D.versements)} retirés cette semaine (ventes), non comptés dans la performance.`);
 }
-document.getElementById("versements").textContent = notes.join(" ");
+const zoneNotes = document.getElementById("versements");
+for (const n of notes) el("span", { style: "display:block" }, zoneNotes, n);
 
 // Top et flop
 const duel = document.getElementById("duel");

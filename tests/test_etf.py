@@ -19,13 +19,14 @@ def transaction(sens, net, jour="2026-01-05"):
 
 class TestAppliquerEtf(unittest.TestCase):
     def setUp(self):
-        self.etat = {"parts": D(0), "apports": D(0)}
+        self.etat = {"parts": D(0), "apports": D(0), "frais": D(0)}
 
     def test_achat_commission_comprise(self):
         # 1 005 € nets = 1 000 € de brut + 5 € de commission (0,50 %), soit 20 parts à 50 €
         self.assertIsNone(db.appliquer_etf(self.etat, transaction("ACHAT", 1005), D(50)))
         self.assertAlmostEqual(float(self.etat["parts"]), 20, places=9)
         self.assertEqual(self.etat["apports"], D(1005))
+        self.assertAlmostEqual(float(self.etat["frais"]), 5, places=9)
 
     def test_vente_encaisse_le_meme_net(self):
         db.appliquer_etf(self.etat, transaction("ACHAT", 2010), D(50))  # 40 parts
@@ -33,6 +34,7 @@ class TestAppliquerEtf(unittest.TestCase):
         self.assertIsNone(db.appliquer_etf(self.etat, transaction("VENTE", 995), D(50)))
         self.assertAlmostEqual(float(self.etat["parts"]), 20, places=9)
         self.assertAlmostEqual(float(self.etat["apports"]), 2010 - 995, places=9)
+        self.assertAlmostEqual(float(self.etat["frais"]), 10 + 5, places=9)
 
     def test_vente_superieure_au_temoin(self):
         db.appliquer_etf(self.etat, transaction("ACHAT", 1005), D(50))  # 20 parts, 1 000 € de brut
