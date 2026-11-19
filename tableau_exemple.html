@@ -23,6 +23,8 @@
   --etf: #b8650a;            /* portefeuille témoin ETF S&P 500 (tirets) */
   --texte-gain: #006300;
   --texte-perte: #b42323;
+  --hausse: #2e7d32;         /* carte des lignes : vert/rouge demandés, doublés du signe */
+  --baisse: #c62828;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -30,7 +32,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
     --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781; --etf: #e0a040;
-    --texte-gain: #0ca30c; --texte-perte: #e66767;
+    --texte-gain: #0ca30c; --texte-perte: #e66767; --hausse: #2b7a30; --baisse: #b83232;
   }
 }
 :root[data-theme="dark"] {
@@ -38,7 +40,7 @@
   --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
   --serie: #3987e5; --gain: #3987e5; --perte: #e66767; --contexte: #898781; --etf: #e0a040;
-  --texte-gain: #0ca30c; --texte-perte: #e66767;
+  --texte-gain: #0ca30c; --texte-perte: #e66767; --hausse: #2b7a30; --baisse: #b83232;
 }
 
 * { box-sizing: border-box; }
@@ -138,6 +140,16 @@ td .isin { color: var(--muted); font-size: 11px; display: block; }
 .partager.fait { color: var(--texte-gain); }
 .texte-partage { width: 100%; min-width: 320px; font: inherit; font-size: 12px; margin-top: 6px; }
 .gain-txt { color: var(--texte-gain); } .perte-txt { color: var(--texte-perte); }
+/* Carte des lignes (treemap) */
+.carte-lignes { position: relative; }
+.carte-lignes .case { position: absolute; border: 2px solid var(--surface); border-radius: 6px; color: #fff;
+                      overflow: hidden; padding: 6px 8px; outline: none; line-height: 1.25; }
+.carte-lignes .case:hover, .carte-lignes .case:focus-visible { filter: brightness(1.12); }
+.carte-lignes .case:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.carte-lignes .code { font-weight: 600; font-size: 13px; display: block; white-space: nowrap; }
+.carte-lignes .perf { font-size: 12px; font-variant-numeric: tabular-nums; display: block; white-space: nowrap; }
+@media (max-width: 520px) { .carte-lignes .case { padding: 4px 5px; } .carte-lignes .code { font-size: 12px; }
+                            .carte-lignes .perf { font-size: 11px; } }
 .vide { color: var(--muted); padding: 32px 0; text-align: center; }
 </style>
 </head>
@@ -191,6 +203,12 @@ td .isin { color: var(--muted); font-size: 11px; display: block; }
       <summary>Voir les données jour par jour</summary>
       <div class="defile"><table id="t-etf"></table></div>
     </details>
+  </section>
+
+  <section class="carte">
+    <h2>Poids et performance par ligne</h2>
+    <p class="note">Surface proportionnelle au poids dans la valorisation ; vert si le dernier cours est au-dessus du PRU (frais inclus), rouge sinon. Détail dans le tableau Positions.</p>
+    <div class="carte-lignes" id="m-lignes"></div>
   </section>
 
   <div class="grille">
@@ -550,13 +568,73 @@ function choisirPeriode(p) {
 }
 boutons.forEach(b => b.addEventListener("click", () => choisirPeriode(b.dataset.periode)));
 
+// ---------- Carte des lignes (treemap « squarified ») ----------
+// Découpe le rectangle (x, y, l, h) en surfaces proportionnelles aux valeurs, triées par ordre décroissant
+function squarifier(valeurs, x, y, l, h) {
+  const total = valeurs.reduce((s, v) => s + v, 0), aires = valeurs.map(v => v * l * h / total), res = [];
+  const pire = (rangee, cote) => {
+    const s = rangee.reduce((a, b) => a + b, 0);
+    return Math.max(cote * cote * Math.max(...rangee) / (s * s), s * s / (cote * cote * Math.min(...rangee)));
+  };
+  for (let i = 0; i < aires.length;) {
+    const cote = Math.min(l, h), rangee = [aires[i++]];
+    while (i < aires.length && pire([...rangee, aires[i]], cote) <= pire(rangee, cote)) rangee.push(aires[i++]);
+    const epaisseur = rangee.reduce((a, b) => a + b, 0) / cote;
+    let pos = 0;
+    for (const a of rangee) {
+      const long = a / epaisseur;
+      res.push(l >= h ? { x, y: y + pos, l: epaisseur, h: long } : { x: x + pos, y, l: long, h: epaisseur });
+      pos += long;
+    }
+    if (l >= h) { x += epaisseur; l -= epaisseur; } else { y += epaisseur; h -= epaisseur; }
+  }
+  return res;
+}
+
+const detailsPosition = p => [
+  [eur.format(p.valorisation ?? 0), "valorisation"],
+  [signe(p.plus_value_latente ?? 0, eur), "plus-value latente", (p.plus_value_latente ?? 0) >= 0 ? "gain-txt" : "perte-txt"],
+  [`${nb.format(p.quantite)} × ${eur.format(p.cours ?? 0)}`, "quantité × cours"],
+  [eur.format(p.pru), "PRU"],
+];
+
+function dessinerCarteLignes() {
+  const conteneur = document.getElementById("m-lignes");
+  conteneur.replaceChildren();
+  const lignes = P.filter(p => (p.valorisation ?? 0) > 0).sort((a, b) => b.valorisation - a.valorisation);
+  if (!lignes.length) { conteneur.style.height = ""; el("div", { class: "vide" }, conteneur, "Aucune position."); return; }
+  // Plus haute que large sur mobile, pour que les petites lignes gardent leur pourcentage
+  const l = conteneur.clientWidth, h = Math.round(l < 600 ? l * 1.3 : Math.max(260, Math.min(420, l * 0.45)));
+  conteneur.style.height = h + "px";
+  const cases = squarifier(lignes.map(p => p.valorisation), 0, 0, l, h);
+  lignes.forEach((p, i) => {
+    const r = cases[i], code = (p.symbole ?? p.libelle).split(".")[0], poids = p.valorisation / totalValo;
+    const hausse = (p.plus_value_pct ?? 0) >= 0;
+    const perf = p.plus_value_pct == null ? "—" : `${hausse ? "▲" : "▼"} ${signe(p.plus_value_pct / 100, pct)}`;
+    const c = el("div", { class: "case", tabindex: 0,
+      "aria-label": `${p.libelle} (${code}) : ${pct.format(poids)} du portefeuille, performance ${perf}` }, conteneur);
+    Object.assign(c.style, { left: r.x + "px", top: r.y + "px", width: r.l + "px", height: r.h + "px",
+                             background: hausse ? "var(--hausse)" : "var(--baisse)" });
+    // Texte seulement s'il tient en entier dans la case (la flèche saute en premier) ; sinon l'infobulle suffit
+    const deborde = () => c.scrollWidth > c.clientWidth || c.scrollHeight > c.clientHeight;
+    const t = el("span", { class: "code" }, c, code);
+    if (deborde()) t.remove();
+    else {
+      const v = el("span", { class: "perf" }, c, perf);
+      if (deborde()) v.textContent = perf.replace(/^[▲▼] /, "");
+      if (deborde()) v.remove();
+    }
+    const montrer = (x, y) => montrerBulle(`${p.libelle} · ${pct.format(poids)} du portefeuille`,
+      [{ valeur: perf, nom: "performance", classe: hausse ? "gain-txt" : "perte-txt" },
+       ...detailsPosition(p).map(([v, n, classe]) => ({ nom: n, valeur: v, classe }))], x, y);
+    c.addEventListener("pointermove", e => montrer(e.clientX, e.clientY));
+    c.addEventListener("pointerleave", cacherBulle);
+    c.addEventListener("focus", () => { const b = c.getBoundingClientRect(); montrer(b.left + b.width / 2, b.top); });
+    c.addEventListener("blur", cacherBulle);
+  });
+}
+
 function dessinerBarres() {
-  const detailsPosition = p => [
-    [eur.format(p.valorisation ?? 0), "valorisation"],
-    [signe(p.plus_value_latente ?? 0, eur), "plus-value latente", (p.plus_value_latente ?? 0) >= 0 ? "gain-txt" : "perte-txt"],
-    [`${nb.format(p.quantite)} × ${eur.format(p.cours ?? 0)}`, "quantité × cours"],
-    [eur.format(p.pru), "PRU"],
-  ];
   barres(document.getElementById("b-performance"),
     [...P].filter(p => p.plus_value_pct != null).sort((a, b) => b.plus_value_pct - a.plus_value_pct)
       .map(p => ({ nom: p.libelle, valeur: p.plus_value_pct, texte: signe(p.plus_value_pct / 100, pct), details: detailsPosition(p) })),
@@ -644,8 +722,9 @@ tableau(document.getElementById("t-transactions"), [
 // Rendu initial, puis au redimensionnement et au changement de thème
 choisirPeriode(periode);
 dessinerBarres();
+dessinerCarteLignes();
 let attente;
-new ResizeObserver(() => { clearTimeout(attente); attente = setTimeout(dessinerEvolution, 80); })
+new ResizeObserver(() => { clearTimeout(attente); attente = setTimeout(() => { dessinerEvolution(); dessinerCarteLignes(); }, 80); })
   .observe(document.querySelector("main"));
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", dessinerEvolution);
 </script>

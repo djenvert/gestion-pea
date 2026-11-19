@@ -67,7 +67,7 @@ Flux : `parser_avis.lire()` → `db.inserer()` → `db.recalculer_valeurs()` + `
 
 Le modèle est en HTML/SVG/JS natif, sans bibliothèque externe, et fonctionne hors ligne. Il suit ces règles :
 - couleurs en variables CSS, avec un mode sombre défini à la fois par `prefers-color-scheme` et par `data-theme` ;
-- bleu = gain et rouge = perte (paire validée pour le daltonisme) ;
+- bleu = gain et rouge = perte (paire validée pour le daltonisme), sauf la carte « Poids et performance par ligne » (treemap), en vert/rouge à la demande du titulaire, doublés d'une flèche et d'un signe ;
 - textes insérés uniquement via `textContent` ;
 - chaque graphique a son équivalent en tableau.
 
